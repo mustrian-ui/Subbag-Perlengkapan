@@ -14,7 +14,8 @@ import GoogleSheetsPanel from './components/GoogleSheetsPanel';
 import GedungSchedule from './components/GedungSchedule';
 import { getAccessToken, appendBookingToSheet, appendVehicleToSheet, appendLogisticsToSheet } from './lib/googleSheets';
 import { collection, onSnapshot, setDoc, doc, deleteDoc } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from './lib/firebase';
+import { db, auth, handleFirestoreError, OperationType } from './lib/firebase';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 
 const DEFAULT_LANDING_CONTENT: LandingPageContent = {
   heroTagline: "Sekretariat Daerah Kota Tarakan",
@@ -81,6 +82,18 @@ export default function App() {
 
   // Hall schedules dataset
   const [schedules, setSchedules] = useState<HallSchedule[]>([]);
+
+  // Firebase Auth state listener
+  useEffect(() => {
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setIsAdminActive(true);
+      } else {
+        setIsAdminActive(false);
+      }
+    });
+    return () => unsubAuth();
+  }, []);
 
   // Real-time Firestore Sync & Seeding Effects
   useEffect(() => {
@@ -526,9 +539,13 @@ export default function App() {
       {/* 1. ADMIN PANEL TOP BANNER INDICATOR */}
       <AdminBar 
         isActive={isAdminActive} 
-        onLogout={() => {
-          setIsAdminActive(false);
-          triggerToast('Sesi Administrator dinonaktifkan.', 'info');
+        onLogout={async () => {
+          try {
+            await signOut(auth);
+            triggerToast('Sesi Administrator dinonaktifkan.', 'info');
+          } catch (err) {
+            console.error('Logout error:', err);
+          }
         }} 
       />
 
@@ -536,9 +553,13 @@ export default function App() {
       <Navbar 
         isAdminActive={isAdminActive}
         onAdminClick={() => setIsAdminLoginOpen(true)}
-        onLogoutAdmin={() => {
-          setIsAdminActive(false);
-          triggerToast('Sesi Administrator dinonaktifkan.', 'info');
+        onLogoutAdmin={async () => {
+          try {
+            await signOut(auth);
+            triggerToast('Sesi Administrator dinonaktifkan.', 'info');
+          } catch (err) {
+            console.error('Logout error:', err);
+          }
         }}
       />
 

@@ -1,5 +1,7 @@
 import { useState, FormEvent } from 'react';
 import { Lock, X, ShieldAlert } from 'lucide-react';
+import { auth } from '../lib/firebase';
+import { signInAnonymously } from 'firebase/auth';
 
 interface AdminLoginModalProps {
   isOpen: boolean;
@@ -18,13 +20,19 @@ export default function AdminLoginModal({
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (password === 'adminsetda') {
-      onLoginSuccess();
-      showToast('Otentikasi Administrator Berhasil! Mode Editor Aktif.', 'success');
-      setPassword('');
-      onClose();
+      try {
+        await signInAnonymously(auth);
+        onLoginSuccess();
+        showToast('Otentikasi Administrator Berhasil! Mode Editor Aktif.', 'success');
+        setPassword('');
+        onClose();
+      } catch (err) {
+        console.error('Firebase Auth sign in failed:', err);
+        showToast('Gagal memulai sesi aman Firebase!', 'error');
+      }
     } else {
       showToast('Sandi Administrator Salah!', 'error');
     }

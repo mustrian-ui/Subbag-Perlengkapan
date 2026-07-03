@@ -1,6 +1,11 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
     // Catch-all rule for general safety
     match /{document=**} {
       allow read, write: if false;
@@ -8,37 +13,44 @@ service cloud.firestore {
 
     // Settings collection for landing page customization
     match /settings/{settingId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
     // Applications list
     match /applications/{appId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
     // Gallery item list
     match /gallery/{galleryId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
-    // Bookings (SIPERUM) list
+    // Bookings (SIPERUM) list - Public can submit, only admin can modify/delete
     match /bookings/{bookingId} {
-      allow read, write: if true;
+      allow read, create: if true;
+      allow update, delete: if isAuthenticated();
     }
 
-    // Vehicles (SIPAKAR) list
+    // Vehicles (SIPAKAR) list - Public can submit, only admin can modify/delete
     match /vehicles/{vehicleId} {
-      allow read, write: if true;
+      allow read, create: if true;
+      allow update, delete: if isAuthenticated();
     }
 
-    // Logistics (SILOGIS) list
+    // Logistics (SILOGIS) list - Public can submit, only admin can modify/delete
     match /logistics/{logisticsId} {
-      allow read, write: if true;
+      allow read, create: if true;
+      allow update, delete: if isAuthenticated();
     }
 
     // Schedules (Jadwal Gedung) list
     match /schedules/{scheduleId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
   }
 }
