@@ -1,0 +1,6 @@
+{
+  "name": "Subbag RT & Perlengkapan Setda Tarakan",
+  "description": "Portal Pelayanan Digital Subbagian Rumah Tangga & Perlengkapan Sekretariat Daerah Kota Tarakan terintegrasi Google Sheets, Drive, dan Jadwal GSG.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
