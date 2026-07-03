@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import AdminBar from './components/AdminBar';
 import Hero from './components/Hero';
@@ -13,6 +13,8 @@ import LandingEditModal from './components/LandingEditModal';
 import GoogleSheetsPanel from './components/GoogleSheetsPanel';
 import GedungSchedule from './components/GedungSchedule';
 import { getAccessToken, appendBookingToSheet, appendVehicleToSheet, appendLogisticsToSheet } from './lib/googleSheets';
+import { collection, onSnapshot, setDoc, doc, deleteDoc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from './lib/firebase';
 
 const DEFAULT_LANDING_CONTENT: LandingPageContent = {
   heroTagline: "Sekretariat Daerah Kota Tarakan",
@@ -56,197 +58,335 @@ export default function App() {
   const [isAdminActive, setIsAdminActive] = useState<boolean>(false);
   const [isAdminLoginOpen, setIsAdminLoginOpen] = useState<boolean>(false);
 
-  // Landing Page customizable content state from localStorage for state retention
-  const [landingContent, setLandingContent] = useState<LandingPageContent>(() => {
-    const saved = localStorage.getItem('pemkot_landing_content');
-    if (saved) {
-      try {
-        return { ...DEFAULT_LANDING_CONTENT, ...JSON.parse(saved) };
-      } catch (e) {
-        console.error('Failed to parse saved landing page content:', e);
-      }
-    }
-    return DEFAULT_LANDING_CONTENT;
-  });
+  // Landing Page customizable content state
+  const [landingContent, setLandingContent] = useState<LandingPageContent>(DEFAULT_LANDING_CONTENT);
 
   const [isLandingEditOpen, setIsLandingEditOpen] = useState<boolean>(false);
   const [landingEditTab, setLandingEditTab] = useState<'hero' | 'visimisi'>('hero');
 
   // Application Dataset State
-  const [applications, setApplications] = useState<Application[]>([
-    {
-      id: 'app_1',
-      title: 'SIPERUM (Pinjam Ruang Rapat)',
-      category: 'internal',
-      icon: 'couch',
-      desc: 'Sistem Elektronik Reservasi Ruang Rapat pada Sekretariat Daerah Kota Tarakan. Lacak jadwal ruangan secara live.'
-    },
-    {
-      id: 'app_2',
-      title: 'SIPAKAR (Layanan Kendaraan Dinas)',
-      category: 'internal',
-      icon: 'car',
-      desc: 'Permohonan surat izin jalan, peminjaman kendaraan operasional dinas, serta pemantauan armada dinas Setda.'
-    },
-    {
-      id: 'app_3',
-      title: 'SILOGIS (Inventaris & ATK)',
-      category: 'logistics',
-      icon: 'box',
-      desc: 'Portal permintaan barang inventaris, alat tulis kantor (ATK), dan logistik rumah tangga secara digital & transparan.'
-    },
-    {
-      id: 'app_4',
-      title: 'LAPOR-RT (Layanan Pengaduan)',
-      category: 'public',
-      icon: 'alert',
-      desc: 'Platform pelaporan kerusakan prasarana, gangguan kebersihan, dan perbaikan fasilitas gedung kantor Setda.'
-    }
-  ]);
+  const [applications, setApplications] = useState<Application[]>([]);
 
   // Gallery Dataset State
-  const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([
-    {
-      id: 'gal_1',
-      title: 'Rapat Koordinasi Optimalisasi Pengelolaan Aset Daerah',
-      category: 'Koordinasi',
-      date: '2026-05-15',
-      url: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=800'
-    },
-    {
-      id: 'gal_2',
-      title: 'Pemeliharaan Rutin Pendingin Ruangan (AC) Aula Serbaguna',
-      category: 'Pemeliharaan',
-      date: '2026-05-18',
-      url: 'https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&q=80&w=800'
-    },
-    {
-      id: 'gal_3',
-      title: 'Pendistribusian Logistik & Paket ATK Bulanan ke Bagian Organisasi',
-      category: 'Logistik',
-      date: '2026-05-20',
-      url: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=800'
-    },
-    {
-      id: 'gal_4',
-      title: 'Sinergitas Keprotokolan Kunjungan Kerja Delegasi Pemerintah Pusat',
-      category: 'Keprotokolan',
-      date: '2026-05-22',
-      url: 'https://images.unsplash.com/photo-1431540015161-0bf868a2d407?auto=format&fit=crop&q=80&w=800'
-    }
-  ]);
+  const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
 
   // Transaction bookings array
-  const [bookings, setBookings] = useState<Booking[]>([
-    { 
-      id: 'book_1', 
-      ruang: 'Ruang Rapat Sembakung', 
-      tanggal: '2026-05-25', 
-      waktu: '09:00 - 12:00 WITA', 
-      agenda: 'Bagian Tata Pemerintahan - Rapat RKPD Dinas Kaltara', 
-      status: 'Disetujui' 
-    },
-    { 
-      id: 'book_2', 
-      ruang: 'Aula Serbaguna Gedung Setda', 
-      tanggal: '2026-05-26', 
-      waktu: '13:00 - 16:00 WITA', 
-      agenda: 'Subbag Protokol - Sosialisasi Digitalisasi Birokrasi', 
-      status: 'Menunggu Konfirmasi' 
-    }
-  ]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
 
   // Vehicular requests array
-  const [vehicles, setVehicles] = useState<Vehicle[]>([
-    { 
-      id: 'veh_1', 
-      kendaraan: 'Toyota Innova (KU 1045 A)', 
-      pemohon: 'Drs. Heri Supriyadi (Bagian Organisasi)', 
-      tujuan: 'Bandara Juwata (Penjemputan DPR RI)', 
-      status: 'Disetujui' 
-    }
-  ]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
 
   // Logistics requirements array
-  const [logistics, setLogistics] = useState<LogisticsRequest[]>([
-    { 
-      id: 'log_1', 
-      barang: 'Kertas HVS A4 80g', 
-      jumlah: '5 Rim (Bagian Hukum)', 
-      status: 'Selesai' 
-    },
-    { 
-      id: 'log_2', 
-      barang: 'Toner Ink HP Deskjet', 
-      jumlah: '2 Box (Bagian Kesejahteraan Rakyat)', 
-      status: 'Diproses' 
-    }
-  ]);
+  const [logistics, setLogistics] = useState<LogisticsRequest[]>([]);
 
   // Hall schedules dataset
-  const [schedules, setSchedules] = useState<HallSchedule[]>(() => {
-    const saved = localStorage.getItem('pemkot_hall_schedules');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('Failed to parse saved schedules:', e);
+  const [schedules, setSchedules] = useState<HallSchedule[]>([]);
+
+  // Real-time Firestore Sync & Seeding Effects
+  useEffect(() => {
+    // 1. Landing content sync
+    const landingRef = doc(db, 'settings', 'landing');
+    const unsubLanding = onSnapshot(landingRef, (snap) => {
+      if (snap.exists()) {
+        setLandingContent(snap.data() as LandingPageContent);
+      } else {
+        setDoc(landingRef, DEFAULT_LANDING_CONTENT).catch(err => {
+          console.error('Failed to seed landing content:', err);
+        });
       }
+    }, (err) => {
+      console.error('Firestore landing content listen error:', err);
+    });
+
+    // 2. Applications sync
+    const appsRef = collection(db, 'applications');
+    const unsubApps = onSnapshot(appsRef, (snap) => {
+      if (!snap.empty) {
+        const list: Application[] = [];
+        snap.forEach(d => list.push(d.data() as Application));
+        list.sort((a, b) => a.id.localeCompare(b.id));
+        setApplications(list);
+      } else {
+        const DEFAULT_APPS: Application[] = [
+          {
+            id: 'app_1',
+            title: 'SIPERUM (Pinjam Ruang Rapat)',
+            category: 'internal',
+            icon: 'couch',
+            desc: 'Sistem Elektronik Reservasi Ruang Rapat pada Sekretariat Daerah Kota Tarakan. Lacak jadwal ruangan secara live.'
+          },
+          {
+            id: 'app_2',
+            title: 'SIPAKAR (Layanan Kendaraan Dinas)',
+            category: 'internal',
+            icon: 'car',
+            desc: 'Permohonan surat izin jalan, peminjaman kendaraan operasional dinas, serta pemantauan armada dinas Setda.'
+          },
+          {
+            id: 'app_3',
+            title: 'SILOGIS (Inventaris & ATK)',
+            category: 'logistics',
+            icon: 'box',
+            desc: 'Portal permintaan barang inventaris, alat tulis kantor (ATK), dan logistik rumah tangga secara digital & transparan.'
+          },
+          {
+            id: 'app_4',
+            title: 'LAPOR-RT (Layanan Pengaduan)',
+            category: 'public',
+            icon: 'alert',
+            desc: 'Platform pelaporan kerusakan prasarana, gangguan kebersihan, dan perbaikan fasilitas gedung kantor Setda.'
+          }
+        ];
+        DEFAULT_APPS.forEach(app => {
+          setDoc(doc(db, 'applications', app.id), app).catch(err => {
+            console.error('Failed to seed application:', app.id, err);
+          });
+        });
+      }
+    }, (err) => {
+      console.error('Firestore applications listen error:', err);
+    });
+
+    // 3. Gallery sync
+    const galleryRef = collection(db, 'gallery');
+    const unsubGallery = onSnapshot(galleryRef, (snap) => {
+      if (!snap.empty) {
+        const list: GalleryItem[] = [];
+        snap.forEach(d => list.push(d.data() as GalleryItem));
+        list.sort((a, b) => b.date.localeCompare(a.date));
+        setGalleryItems(list);
+      } else {
+        const DEFAULT_GALLERY: GalleryItem[] = [
+          {
+            id: 'gal_1',
+            title: 'Rapat Koordinasi Optimalisasi Pengelolaan Aset Daerah',
+            category: 'Koordinasi',
+            date: '2026-05-15',
+            url: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=800'
+          },
+          {
+            id: 'gal_2',
+            title: 'Pemeliharaan Rutin Pendingin Ruangan (AC) Aula Serbaguna',
+            category: 'Pemeliharaan',
+            date: '2026-05-18',
+            url: 'https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&q=80&w=800'
+          },
+          {
+            id: 'gal_3',
+            title: 'Pendistribusian Logistik & Paket ATK Bulanan ke Bagian Organisasi',
+            category: 'Logistik',
+            date: '2026-05-20',
+            url: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=800'
+          },
+          {
+            id: 'gal_4',
+            title: 'Sinergitas Keprotokolan Kunjungan Kerja Delegasi Pemerintah Pusat',
+            category: 'Keprotokolan',
+            date: '2026-05-22',
+            url: 'https://images.unsplash.com/photo-1431540015161-0bf868a2d407?auto=format&fit=crop&q=80&w=800'
+          }
+        ];
+        DEFAULT_GALLERY.forEach(item => {
+          setDoc(doc(db, 'gallery', item.id), item).catch(err => {
+            console.error('Failed to seed gallery:', item.id, err);
+          });
+        });
+      }
+    }, (err) => {
+      console.error('Firestore gallery listen error:', err);
+    });
+
+    // 4. Bookings sync
+    const bookingsRef = collection(db, 'bookings');
+    const unsubBookings = onSnapshot(bookingsRef, (snap) => {
+      if (!snap.empty) {
+        const list: Booking[] = [];
+        snap.forEach(d => list.push(d.data() as Booking));
+        list.sort((a, b) => b.id.localeCompare(a.id));
+        setBookings(list);
+      } else {
+        const DEFAULT_BOOKINGS: Booking[] = [
+          { 
+            id: 'book_1', 
+            ruang: 'Gedung Lubung', 
+            tanggal: '2026-05-25', 
+            waktu: '09:00 - 12:00 WITA', 
+            agenda: 'Bagian Tata Pemerintahan - Rapat RKPD Dinas Kaltara', 
+            status: 'Disetujui',
+            pemohon: 'Drs. Heri Supriyadi',
+            instansi: 'Bagian Tata Pemerintahan'
+          },
+          { 
+            id: 'book_2', 
+            ruang: 'Gedung Serbaguna', 
+            tanggal: '2026-05-26', 
+            waktu: '13:00 - 16:00 WITA', 
+            agenda: 'Subbag Protokol - Sosialisasi Digitalisasi Birokrasi', 
+            status: 'Menunggu Konfirmasi',
+            pemohon: 'Staff Protokol',
+            instansi: 'Subbag Protokol Setda'
+          }
+        ];
+        DEFAULT_BOOKINGS.forEach(b => {
+          setDoc(doc(db, 'bookings', b.id), b).catch(err => {
+            console.error('Failed to seed booking:', b.id, err);
+          });
+        });
+      }
+    }, (err) => {
+      console.error('Firestore bookings listen error:', err);
+    });
+
+    // 5. Vehicles sync
+    const vehiclesRef = collection(db, 'vehicles');
+    const unsubVehicles = onSnapshot(vehiclesRef, (snap) => {
+      if (!snap.empty) {
+        const list: Vehicle[] = [];
+        snap.forEach(d => list.push(d.data() as Vehicle));
+        list.sort((a, b) => b.id.localeCompare(a.id));
+        setVehicles(list);
+      } else {
+        const DEFAULT_VEHICLES: Vehicle[] = [
+          { 
+            id: 'veh_1', 
+            kendaraan: 'Toyota Innova (KU 1045 A)', 
+            pemohon: 'Drs. Heri Supriyadi', 
+            instansi: 'Bagian Organisasi Setda',
+            tujuan: 'Bandara Juwata (Penjemputan DPR RI)', 
+            status: 'Disetujui' 
+          }
+        ];
+        DEFAULT_VEHICLES.forEach(v => {
+          setDoc(doc(db, 'vehicles', v.id), v).catch(err => {
+            console.error('Failed to seed vehicle:', v.id, err);
+          });
+        });
+      }
+    }, (err) => {
+      console.error('Firestore vehicles listen error:', err);
+    });
+
+    // 6. Logistics sync
+    const logisticsRef = collection(db, 'logistics');
+    const unsubLogistics = onSnapshot(logisticsRef, (snap) => {
+      if (!snap.empty) {
+        const list: LogisticsRequest[] = [];
+        snap.forEach(d => list.push(d.data() as LogisticsRequest));
+        list.sort((a, b) => b.id.localeCompare(a.id));
+        setLogistics(list);
+      } else {
+        const DEFAULT_LOGISTICS: LogisticsRequest[] = [
+          { 
+            id: 'log_1', 
+            barang: 'Kertas HVS A4 80g', 
+            jumlah: '5 Rim', 
+            status: 'Selesai',
+            kegiatan: 'Administrasi Umum',
+            pemohon: 'Staff Hukum',
+            instansi: 'Bagian Hukum Setda'
+          },
+          { 
+            id: 'log_2', 
+            barang: 'Toner Ink HP Deskjet', 
+            jumlah: '2 Box', 
+            status: 'Diproses',
+            kegiatan: 'Cetak Dokumen Laporan',
+            pemohon: 'Staff Kesra',
+            instansi: 'Bagian Kesejahteraan Rakyat Setda'
+          }
+        ];
+        DEFAULT_LOGISTICS.forEach(l => {
+          setDoc(doc(db, 'logistics', l.id), l).catch(err => {
+            console.error('Failed to seed logistics:', l.id, err);
+          });
+        });
+      }
+    }, (err) => {
+      console.error('Firestore logistics listen error:', err);
+    });
+
+    // 7. Schedules sync
+    const schedulesRef = collection(db, 'schedules');
+    const unsubSchedules = onSnapshot(schedulesRef, (snap) => {
+      if (!snap.empty) {
+        const list: HallSchedule[] = [];
+        snap.forEach(d => list.push(d.data() as HallSchedule));
+        list.sort((a, b) => a.hariTanggal.localeCompare(b.hariTanggal));
+        setSchedules(list);
+      } else {
+        const DEFAULT_SCHEDULES: HallSchedule[] = [
+          {
+            id: 'sched_1',
+            hariTanggal: 'Senin, 15 Juni 2026',
+            kegiatan: 'Rapat Rencana Kerja Anggaran APBD-Perubahan 2026',
+            instansi: 'Bappeda Litbang Kota Tarakan',
+            keterangan: 'Lengkap'
+          },
+          {
+            id: 'sched_2',
+            hariTanggal: 'Selasa, 16 Juni 2026',
+            kegiatan: 'Pembekalan Teknis Aplikasi SIPERUM & SIPAKAR Internal Setda',
+            instansi: 'Subbag Rumah Tangga & Perlengkapan',
+            keterangan: 'Lengkap'
+          },
+          {
+            id: 'sched_3',
+            hariTanggal: 'Rabu, 17 Juni 2026',
+            kegiatan: 'Audiensi Pemangku Kepentingan Pariwisata Bersama Walikota Tarakan',
+            instansi: 'Bagian Protokol dan Komunikasi Pimpinan',
+            keterangan: 'Lengkap'
+          },
+          {
+            id: 'sched_4',
+            hariTanggal: 'Jumat, 19 Juni 2026',
+            kegiatan: 'Bimbingan Teknis Penginputan e-Monev Kota Tarakan',
+            instansi: 'Bagian Organisasi Setda',
+            keterangan: 'Tunda / Reschedule'
+          }
+        ];
+        DEFAULT_SCHEDULES.forEach(s => {
+          setDoc(doc(db, 'schedules', s.id), s).catch(err => {
+            console.error('Failed to seed schedule:', s.id, err);
+          });
+        });
+      }
+    }, (err) => {
+      console.error('Firestore schedules listen error:', err);
+    });
+
+    return () => {
+      unsubLanding();
+      unsubApps();
+      unsubGallery();
+      unsubBookings();
+      unsubVehicles();
+      unsubLogistics();
+      unsubSchedules();
+    };
+  }, []);
+
+  const handleAddSchedule = async (newSched: HallSchedule) => {
+    try {
+      await setDoc(doc(db, 'schedules', newSched.id), newSched);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `schedules/${newSched.id}`);
     }
-    return [
-      {
-        id: 'sched_1',
-        hariTanggal: 'Senin, 15 Juni 2026',
-        kegiatan: 'Rapat Rencana Kerja Anggaran APBD-Perubahan 2026',
-        instansi: 'Bappeda Litbang Kota Tarakan',
-        keterangan: 'Lengkap'
-      },
-      {
-        id: 'sched_2',
-        hariTanggal: 'Selasa, 16 Juni 2026',
-        kegiatan: 'Pembekalan Teknis Aplikasi SIPERUM & SIPAKAR Internal Setda',
-        instansi: 'Subbag Rumah Tangga & Perlengkapan',
-        keterangan: 'Lengkap'
-      },
-      {
-        id: 'sched_3',
-        hariTanggal: 'Rabu, 17 Juni 2026',
-        kegiatan: 'Audiensi Pemangku Kepentingan Pariwisata Bersama Walikota Tarakan',
-        instansi: 'Bagian Protokol dan Komunikasi Pimpinan',
-        keterangan: 'Lengkap'
-      },
-      {
-        id: 'sched_4',
-        hariTanggal: 'Jumat, 19 Juni 2026',
-        kegiatan: 'Bimbingan Teknis Penginputan e-Monev Kota Tarakan',
-        instansi: 'Bagian Organisasi Setda',
-        keterangan: 'Tunda / Reschedule'
-      }
-    ];
-  });
-
-  const handleAddSchedule = (newSched: HallSchedule) => {
-    setSchedules((prev) => {
-      const updated = [newSched, ...prev];
-      localStorage.setItem('pemkot_hall_schedules', JSON.stringify(updated));
-      return updated;
-    });
   };
 
-  const handleUpdateSchedule = (updatedSched: HallSchedule) => {
-    setSchedules((prev) => {
-      const updated = prev.map((item) => (item.id === updatedSched.id ? updatedSched : item));
-      localStorage.setItem('pemkot_hall_schedules', JSON.stringify(updated));
-      return updated;
-    });
+  const handleUpdateSchedule = async (updatedSched: HallSchedule) => {
+    try {
+      await setDoc(doc(db, 'schedules', updatedSched.id), updatedSched);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `schedules/${updatedSched.id}`);
+    }
   };
 
-  const handleDeleteSchedule = (id: string) => {
-    setSchedules((prev) => {
-      const updated = prev.filter((item) => item.id !== id);
-      localStorage.setItem('pemkot_hall_schedules', JSON.stringify(updated));
-      return updated;
-    });
+  const handleDeleteSchedule = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'schedules', id));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `schedules/${id}`);
+    }
   };
 
   // Helper trigger callback for toaster messages
@@ -255,28 +395,52 @@ export default function App() {
   };
 
   // State adjustment callbacks
-  const handleAddApplication = (newApp: Application) => {
-    setApplications((prev) => [...prev, newApp]);
+  const handleAddApplication = async (newApp: Application) => {
+    try {
+      await setDoc(doc(db, 'applications', newApp.id), newApp);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `applications/${newApp.id}`);
+    }
   };
 
-  const handleEditApplication = (editedApp: Application) => {
-    setApplications((prev) => prev.map((app) => (app.id === editedApp.id ? editedApp : app)));
+  const handleEditApplication = async (editedApp: Application) => {
+    try {
+      await setDoc(doc(db, 'applications', editedApp.id), editedApp);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `applications/${editedApp.id}`);
+    }
   };
 
-  const handleDeleteApplication = (id: string) => {
-    setApplications((prev) => prev.filter((app) => app.id !== id));
+  const handleDeleteApplication = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'applications', id));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `applications/${id}`);
+    }
   };
 
-  const handleAddGalleryItem = (newItem: GalleryItem) => {
-    setGalleryItems((prev) => [newItem, ...prev]);
+  const handleAddGalleryItem = async (newItem: GalleryItem) => {
+    try {
+      await setDoc(doc(db, 'gallery', newItem.id), newItem);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `gallery/${newItem.id}`);
+    }
   };
 
-  const handleDeleteGalleryItem = (id: string) => {
-    setGalleryItems((prev) => prev.filter((item) => item.id !== id));
+  const handleDeleteGalleryItem = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'gallery', id));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `gallery/${id}`);
+    }
   };
 
   const handleAddBooking = async (newBooking: Booking) => {
-    setBookings((prev) => [newBooking, ...prev]);
+    try {
+      await setDoc(doc(db, 'bookings', newBooking.id), newBooking);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `bookings/${newBooking.id}`);
+    }
     
     // Auto-sync to Google Sheet if configured
     const spreadsheetId = localStorage.getItem('pemkot_sheets_id');
@@ -295,7 +459,11 @@ export default function App() {
   };
 
   const handleAddVehicle = async (newVeh: Vehicle) => {
-    setVehicles((prev) => [newVeh, ...prev]);
+    try {
+      await setDoc(doc(db, 'vehicles', newVeh.id), newVeh);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `vehicles/${newVeh.id}`);
+    }
     
     // Auto-sync to Google Sheet if configured
     const spreadsheetId = localStorage.getItem('pemkot_sheets_id');
@@ -314,7 +482,11 @@ export default function App() {
   };
 
   const handleAddLogistics = async (newReq: LogisticsRequest) => {
-    setLogistics((prev) => [newReq, ...prev]);
+    try {
+      await setDoc(doc(db, 'logistics', newReq.id), newReq);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `logistics/${newReq.id}`);
+    }
     
     // Auto-sync to Google Sheet if configured
     const spreadsheetId = localStorage.getItem('pemkot_sheets_id');
@@ -515,10 +687,13 @@ export default function App() {
         onClose={() => setIsLandingEditOpen(false)}
         content={landingContent}
         defaultTab={landingEditTab}
-        onSave={(newContent) => {
-          setLandingContent(newContent);
-          localStorage.setItem('pemkot_landing_content', JSON.stringify(newContent));
-          triggerToast('Susunan konten halaman utama berhasil diperbarui!', 'success');
+        onSave={async (newContent) => {
+          try {
+            await setDoc(doc(db, 'settings', 'landing'), newContent);
+            triggerToast('Susunan konten halaman utama berhasil diperbarui!', 'success');
+          } catch (err) {
+            handleFirestoreError(err, OperationType.WRITE, 'settings/landing');
+          }
         }}
       />
 

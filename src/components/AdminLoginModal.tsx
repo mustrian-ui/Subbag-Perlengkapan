@@ -67,7 +67,7 @@ export default function AdminLoginModal({
                 required
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600 text-sm transition"
-                placeholder="Sandi default: adminsetda"
+                placeholder="Masukkan kata sandi..."
               />
             </div>
           </div>

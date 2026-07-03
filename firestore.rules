@@ -1,0 +1,44 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Catch-all rule for general safety
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Settings collection for landing page customization
+    match /settings/{settingId} {
+      allow read, write: if true;
+    }
+
+    // Applications list
+    match /applications/{appId} {
+      allow read, write: if true;
+    }
+
+    // Gallery item list
+    match /gallery/{galleryId} {
+      allow read, write: if true;
+    }
+
+    // Bookings (SIPERUM) list
+    match /bookings/{bookingId} {
+      allow read, write: if true;
+    }
+
+    // Vehicles (SIPAKAR) list
+    match /vehicles/{vehicleId} {
+      allow read, write: if true;
+    }
+
+    // Logistics (SILOGIS) list
+    match /logistics/{logisticsId} {
+      allow read, write: if true;
+    }
+
+    // Schedules (Jadwal Gedung) list
+    match /schedules/{scheduleId} {
+      allow read, write: if true;
+    }
+  }
+}

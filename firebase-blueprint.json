@@ -1,0 +1,144 @@
+{
+  "entities": {
+    "LandingContent": {
+      "title": "LandingContent",
+      "description": "Customizable homepage sections and texts",
+      "type": "object",
+      "properties": {
+        "heroTagline": { "type": "string" },
+        "heroTitlePrefix": { "type": "string" },
+        "heroTitleAccent": { "type": "string" },
+        "heroDesc": { "type": "string" },
+        "heroBgUrl": { "type": "string" },
+        "heroPhone": { "type": "string" },
+        "visiMisiSubtitle": { "type": "string" },
+        "visiTitle": { "type": "string" },
+        "visiText": { "type": "string" },
+        "misiSubtitle": { "type": "string" },
+        "misiTitle": { "type": "string" },
+        "misiItems": { "type": "array" }
+      },
+      "required": ["heroTagline", "heroTitlePrefix", "heroTitleAccent", "heroDesc", "heroBgUrl"]
+    },
+    "Application": {
+      "title": "Application",
+      "description": "Active systems/applications in Setda Tarakan",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "icon": { "type": "string" },
+        "desc": { "type": "string" }
+      },
+      "required": ["id", "title", "category", "icon", "desc"]
+    },
+    "GalleryItem": {
+      "title": "GalleryItem",
+      "description": "Documented snapshot and activities",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "date": { "type": "string" },
+        "url": { "type": "string" }
+      },
+      "required": ["id", "title", "category", "date", "url"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "SIPERUM Room Booking reservations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ruang": { "type": "string" },
+        "tanggal": { "type": "string" },
+        "waktu": { "type": "string" },
+        "agenda": { "type": "string" },
+        "status": { "type": "string" },
+        "documentUrl": { "type": "string" },
+        "documentName": { "type": "string" },
+        "pemohon": { "type": "string" },
+        "instansi": { "type": "string" }
+      },
+      "required": ["id", "ruang", "tanggal", "waktu", "agenda", "status"]
+    },
+    "Vehicle": {
+      "title": "Vehicle",
+      "description": "SIPAKAR Vehicle booking requests",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "kendaraan": { "type": "string" },
+        "pemohon": { "type": "string" },
+        "tujuan": { "type": "string" },
+        "status": { "type": "string" },
+        "documentUrl": { "type": "string" },
+        "documentName": { "type": "string" },
+        "instansi": { "type": "string" }
+      },
+      "required": ["id", "kendaraan", "pemohon", "tujuan", "status"]
+    },
+    "LogisticsRequest": {
+      "title": "LogisticsRequest",
+      "description": "SILOGIS Inventory & logistics requests",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "barang": { "type": "string" },
+        "jumlah": { "type": "string" },
+        "status": { "type": "string" },
+        "documentUrl": { "type": "string" },
+        "documentName": { "type": "string" },
+        "kegiatan": { "type": "string" },
+        "pemohon": { "type": "string" },
+        "instansi": { "type": "string" }
+      },
+      "required": ["id", "barang", "jumlah", "status"]
+    },
+    "HallSchedule": {
+      "title": "HallSchedule",
+      "description": "Jadwal Penggunaan Gedung Serba Guna",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "hariTanggal": { "type": "string" },
+        "kegiatan": { "type": "string" },
+        "instansi": { "type": "string" },
+        "keterangan": { "type": "string" }
+      },
+      "required": ["id", "hariTanggal", "kegiatan", "instansi", "keterangan"]
+    }
+  },
+  "firestore": {
+    "settings/landing": {
+      "schema": "LandingContent",
+      "description": "Single document holding the customizable page copy"
+    },
+    "applications/{appId}": {
+      "schema": "Application",
+      "description": "Dynamic service micro-applications"
+    },
+    "gallery/{galleryId}": {
+      "schema": "GalleryItem",
+      "description": "Documented activities gallery"
+    },
+    "bookings/{bookingId}": {
+      "schema": "Booking",
+      "description": "Room reservations"
+    },
+    "vehicles/{vehicleId}": {
+      "schema": "Vehicle",
+      "description": "Armada car reservations"
+    },
+    "logistics/{logisticsId}": {
+      "schema": "LogisticsRequest",
+      "description": "Logistics and item requirements"
+    },
+    "schedules/{scheduleId}": {
+      "schema": "HallSchedule",
+      "description": "Shared hall/building schedules"
+    }
+  }
+}
