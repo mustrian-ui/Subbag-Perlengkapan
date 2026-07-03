@@ -362,8 +362,9 @@ export default function LandingEditModal({
 
         {/* Modal Footer */}
         <div className="bg-slate-50 p-5 px-6 border-t border-slate-200 flex items-center justify-between">
-          <div className="text-xs text-slate-500 font-medium">
-            * Perubahan hanya akan disimpan ke memori browser lokal (Local Storage)
+          <div className="text-xs text-emerald-600 font-bold flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>Perubahan disimpan langsung ke Cloud Database (Firestore) agar terlihat oleh semua pengunjung</span>
           </div>
           <div className="flex gap-3">
             <button
