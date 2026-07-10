@@ -1,6 +1,8 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { X, Save, Plus, Trash2, Sparkles, Compass, CheckCircle, Image, PhoneCall } from 'lucide-react';
 import { LandingPageContent, MisiItem } from '../types';
+// @ts-ignore
+import pnsHeroBackground from '../assets/images/pns_hero_background_1783294463163.jpg';
 
 interface LandingEditModalProps {
   isOpen: boolean;
@@ -213,13 +215,22 @@ export default function LandingEditModal({
                     <Image className="w-4 h-4 text-slate-400" />
                     <span>Gambar Latar Belakang (URL)</span>
                   </label>
-                  <input
-                    type="url"
-                    value={heroBgUrl}
-                    onChange={(e) => setHeroBgUrl(e.target.value)}
-                    placeholder="Masukkan URL Gambar valid (Unsplash, Ibb, dsb)"
-                    className="w-full text-xs font-mono px-4 py-3 rounded-xl border border-slate-250 focus:border-blue-500 focus:ring focus:ring-blue-200 outline-none transition"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={heroBgUrl}
+                      onChange={(e) => setHeroBgUrl(e.target.value)}
+                      placeholder="Masukkan URL Gambar valid (Unsplash, Ibb, dsb)"
+                      className="flex-grow text-xs font-mono px-4 py-3 rounded-xl border border-slate-250 focus:border-blue-500 focus:ring focus:ring-blue-200 outline-none transition"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setHeroBgUrl(pnsHeroBackground)}
+                      className="px-4 py-2 bg-amber-500/10 hover:bg-amber-500/25 border border-amber-500/20 text-amber-900 rounded-xl text-xs font-bold transition whitespace-nowrap active:scale-95 cursor-pointer"
+                    >
+                      Set Gambar Sepasang PNS
+                    </button>
+                  </div>
                 </div>
 
                 {/* Hero Phone Support */}

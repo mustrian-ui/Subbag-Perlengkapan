@@ -1,7 +1,8 @@
 import { useState, FormEvent } from 'react';
-import { Lock, X, ShieldAlert } from 'lucide-react';
+import { Lock, X, ShieldAlert, AlertTriangle, ExternalLink } from 'lucide-react';
 import { auth } from '../lib/firebase';
 import { signInAnonymously } from 'firebase/auth';
+import firebaseConfig from '../../firebase-applet-config.json';
 
 interface AdminLoginModalProps {
   isOpen: boolean;
@@ -17,11 +18,13 @@ export default function AdminLoginModal({
   showToast
 }: AdminLoginModalProps) {
   const [password, setPassword] = useState('');
+  const [authError, setAuthError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    setAuthError(null);
     if (password === 'adminsetda') {
       try {
         await signInAnonymously(auth);
@@ -29,9 +32,15 @@ export default function AdminLoginModal({
         showToast('Otentikasi Administrator Berhasil! Mode Editor Aktif.', 'success');
         setPassword('');
         onClose();
-      } catch (err) {
+      } catch (err: any) {
         console.error('Firebase Auth sign in failed:', err);
-        showToast('Gagal memulai sesi aman Firebase!', 'error');
+        if (err && (err.code === 'auth/admin-restricted-operation' || String(err).includes('admin-restricted-operation'))) {
+          setAuthError('restricted');
+          showToast('Otentikasi dibatasi! Silakan aktifkan Anonymous Sign-in di Firebase Console.', 'error');
+        } else {
+          setAuthError(err?.message || String(err));
+          showToast('Gagal memulai sesi aman Firebase!', 'error');
+        }
       }
     } else {
       showToast('Sandi Administrator Salah!', 'error');
@@ -40,7 +49,7 @@ export default function AdminLoginModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl border border-slate-100 transform scale-100 transition-all duration-300">
+      <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl border border-slate-100 transform scale-100 transition-all duration-300">
         <div className="bg-slate-900 text-white p-6 relative">
           <button
             onClick={onClose}
@@ -63,6 +72,70 @@ export default function AdminLoginModal({
           <p className="text-xs text-slate-500 leading-relaxed">
             Masukkan sandi otentikasi administrator Anda untuk mengaktifkan panel tambah, edit, dan hapus layanan & galeri.
           </p>
+
+          {authError === 'restricted' && (
+            <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-800 space-y-3 animate-fade-in">
+              <div className="flex items-start gap-2 font-bold text-amber-950">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <span>Otentikasi Anonim Dibatasi (Admin Restricted)</span>
+              </div>
+              <p className="leading-relaxed">
+                GCP / Firebase memblokir login anonim secara default dengan pesan error <code>auth/admin-restricted-operation</code>. Ikuti langkah mudah berikut untuk mengaktifkannya:
+              </p>
+              
+              <div className="space-y-2">
+                <p className="font-bold text-slate-800 border-b pb-1 text-[11px]">Langkah 1: Aktifkan Provider Anonim</p>
+                <ol className="list-decimal list-inside space-y-1 pl-1 text-slate-700 font-medium">
+                  <li className="pl-1">
+                    <a
+                      href={`https://console.firebase.google.com/project/${firebaseConfig.projectId}/authentication/providers`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-teal-700 hover:text-teal-900 font-bold underline cursor-pointer hover:bg-teal-50 px-1 py-0.5 rounded"
+                    >
+                      Buka Firebase Console <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </li>
+                  <li className="pl-1">Klik tombol <strong>Add new provider</strong></li>
+                  <li className="pl-1">Pilih <strong>Anonymous</strong>, lalu klik <strong>Enable</strong> dan <strong>Save</strong></li>
+                </ol>
+              </div>
+
+              <div className="space-y-2 pt-1 border-t border-amber-200">
+                <p className="font-bold text-slate-800 border-b pb-1 text-[11px]">Langkah 2: Nonaktifkan Proteksi Block di GCP</p>
+                <ol className="list-decimal list-inside space-y-1 pl-1 text-slate-700 font-medium animate-pulse">
+                  <li className="pl-1">
+                    <a
+                      href={`https://console.cloud.google.com/customer-identity/settings?project=${firebaseConfig.projectId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-amber-800 hover:text-amber-950 font-bold underline cursor-pointer hover:bg-amber-100 px-1 py-0.5 rounded"
+                    >
+                      Buka Google Cloud Console Settings <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </li>
+                  <li className="pl-1">Buka tab <strong>Security</strong> di bagian atas</li>
+                  <li className="pl-1">Cari opsi <strong>Prevent anonymous sign-in</strong> (Cegah masuk anonim)</li>
+                  <li className="pl-1">Ubah statusnya menjadi <strong>Disabled (Nonaktif)</strong> / matikan centangnya, lalu klik <strong>Save</strong></li>
+                </ol>
+              </div>
+
+              <p className="text-[10px] text-amber-600 font-semibold italic">
+                Setelah kedua langkah di atas selesai, silakan masukkan password kembali lalu klik tombol <strong>Verifikasi & Aktifkan Sesi</strong>.
+              </p>
+            </div>
+          )}
+
+          {authError && authError !== 'restricted' && (
+            <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex gap-2 items-start">
+              <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold">Error Otentikasi:</span>
+                <p className="mt-0.5 font-mono text-[10px] opacity-90">{authError}</p>
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-bold text-slate-600 mb-2">
               Kata Sandi Admin

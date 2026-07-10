@@ -31,15 +31,16 @@ export default function Hero({ onAksesClick, onVisiClick, isAdminActive, content
       
       {/* Background Image with optimized fit, safety opacity and elegant fade-in */}
       <div 
-        className="absolute inset-0 bg-cover bg-center opacity-30 transform scale-100 transition-all duration-1000"
+        className="absolute inset-0 bg-cover opacity-75 transform scale-100 transition-all duration-1000"
         style={{ 
-          backgroundImage: `url('${content.heroBgUrl || 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=1600'}')` 
+          backgroundImage: `url('${content.heroBgUrl || 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=1600'}')`,
+          backgroundPosition: '0% 50%'
         }}
         role="presentation"
       />
       
       {/* Rich gradient overlay with the custom theme colors */}
-      <div className="absolute inset-0 hero-gradient mix-blend-multiply" />
+      <div className="absolute inset-0 hero-gradient" />
 
       {/* Floating admin controller when admin session is active */}
       {isAdminActive && (

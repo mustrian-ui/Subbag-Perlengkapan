@@ -16,13 +16,15 @@ import { getAccessToken, appendBookingToSheet, appendVehicleToSheet, appendLogis
 import { collection, onSnapshot, setDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from './lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
+// @ts-ignore
+import pnsHeroBackground from './assets/images/pns_hero_background_1783294463163.jpg';
 
 const DEFAULT_LANDING_CONTENT: LandingPageContent = {
   heroTagline: "Sekretariat Daerah Kota Tarakan",
   heroTitlePrefix: "Subbagian Rumah Tangga",
   heroTitleAccent: "& Perlengkapan",
   heroDesc: "Berkomitmen tinggi menyelenggarakan pelayanan rumah tangga, akomodasi keprotokolan negara, pemeliharaan sarana prasarana vital, serta tata kelola logistik perlengkapan guna mendukung kelancaran administrasi pemerintahan Kota Tarakan yang mandiri dan dinamis.",
-  heroBgUrl: "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=1600",
+  heroBgUrl: pnsHeroBackground,
   heroPhone: "(0551) 21122",
   visiMisiSubtitle: "Arah Pembangunan Daerah",
   visiTitle: "Visi & Misi Kota Tarakan",
@@ -101,7 +103,16 @@ export default function App() {
     const landingRef = doc(db, 'settings', 'landing');
     const unsubLanding = onSnapshot(landingRef, (snap) => {
       if (snap.exists()) {
-        setLandingContent(snap.data() as LandingPageContent);
+        const data = snap.data() as LandingPageContent;
+        if (data.heroBgUrl === "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=1600" || !data.heroBgUrl) {
+          const updatedContent = { ...data, heroBgUrl: pnsHeroBackground };
+          setDoc(landingRef, updatedContent).catch(err => {
+            console.error('Failed to update landing hero background to PNS default:', err);
+          });
+          setLandingContent(updatedContent);
+        } else {
+          setLandingContent(data);
+        }
       } else {
         setDoc(landingRef, DEFAULT_LANDING_CONTENT).catch(err => {
           console.error('Failed to seed landing content:', err);
