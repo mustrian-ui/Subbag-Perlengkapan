@@ -13,9 +13,8 @@
 
 /* Custom CSS helper styles for modern glass UI */
 .glass-card {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(241, 245, 249, 0.8);
+  background: rgba(255, 255, 255, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .hero-gradient {

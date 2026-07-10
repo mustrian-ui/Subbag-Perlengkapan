@@ -16,8 +16,7 @@ import { getAccessToken, appendBookingToSheet, appendVehicleToSheet, appendLogis
 import { collection, onSnapshot, setDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from './lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-// @ts-ignore
-import pnsHeroBackground from './assets/images/pns_hero_background_1783294463163.jpg';
+const pnsHeroBackground = 'https://i.ibb.co.com/k2pcNHtX/back-Asn.png';
 
 const DEFAULT_LANDING_CONTENT: LandingPageContent = {
   heroTagline: "Sekretariat Daerah Kota Tarakan",
@@ -104,7 +103,12 @@ export default function App() {
     const unsubLanding = onSnapshot(landingRef, (snap) => {
       if (snap.exists()) {
         const data = snap.data() as LandingPageContent;
-        if (data.heroBgUrl === "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=1600" || !data.heroBgUrl) {
+        if (
+          data.heroBgUrl === "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=1600" || 
+          !data.heroBgUrl || 
+          data.heroBgUrl.includes('pns_hero_background') || 
+          data.heroBgUrl.includes('/assets/images/')
+        ) {
           const updatedContent = { ...data, heroBgUrl: pnsHeroBackground };
           setDoc(landingRef, updatedContent).catch(err => {
             console.error('Failed to update landing hero background to PNS default:', err);

@@ -1,8 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { X, Save, Plus, Trash2, Sparkles, Compass, CheckCircle, Image, PhoneCall } from 'lucide-react';
 import { LandingPageContent, MisiItem } from '../types';
-// @ts-ignore
-import pnsHeroBackground from '../assets/images/pns_hero_background_1783294463163.jpg';
+const pnsHeroBackground = 'https://i.ibb.co.com/k2pcNHtX/back-Asn.png';
 
 interface LandingEditModalProps {
   isOpen: boolean;

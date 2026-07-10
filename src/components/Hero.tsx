@@ -117,44 +117,44 @@ export default function Hero({ onAksesClick, onVisiClick, isAdminActive, content
                 </div>
                 
                 <div className="space-y-1.5">
-                  <h3 className="text-slate-900 font-extrabold text-lg sm:text-xl">
+                  <h3 className="text-slate-950 font-black text-lg sm:text-xl">
                     Layanan Umum Utama
                   </h3>
-                  <p className="text-xs text-slate-500 font-medium">
+                  <p className="text-xs text-slate-800 font-semibold leading-relaxed">
                     Mendukung jalannya pelayanan publik dengan fasilitas prima dan terkelola secara cermat
                   </p>
                 </div>
                 
-                <div className="divide-y divide-slate-105 border-t border-b border-slate-100">
+                <div className="divide-y divide-slate-200/80 border-t border-b border-slate-200/80">
                   <div className="flex items-center justify-between py-3 text-xs sm:text-sm">
-                    <span className="text-slate-500 flex items-center gap-2 font-semibold">
-                      <Briefcase className="w-4 h-4 text-teal-600" /> Manajemen Rumah Tangga
+                    <span className="text-slate-900 flex items-center gap-2 font-bold">
+                      <Briefcase className="w-4 h-4 text-teal-700" /> Manajemen Rumah Tangga
                     </span>
-                    <span className="font-extrabold text-slate-800 text-xs bg-teal-50 text-teal-800 px-2 py-0.5 rounded-md border border-teal-100">
+                    <span className="font-bold text-xs bg-teal-100 text-teal-950 px-2.5 py-0.5 rounded-full border border-teal-200">
                       Aktif Melayani
                     </span>
                   </div>
                   <div className="flex items-center justify-between py-3 text-xs sm:text-sm">
-                    <span className="text-slate-500 flex items-center gap-2 font-semibold">
-                      <Box className="w-4 h-4 text-teal-600" /> Logistik Perlengkapan
+                    <span className="text-slate-900 flex items-center gap-2 font-bold">
+                      <Box className="w-4 h-4 text-teal-700" /> Logistik Perlengkapan
                     </span>
-                    <span className="font-extrabold text-slate-800 text-xs bg-amber-50 text-amber-800 px-2 py-0.5 rounded-md border border-amber-100">
+                    <span className="font-bold text-xs bg-amber-100 text-amber-950 px-2.5 py-0.5 rounded-full border border-amber-200">
                       Sistem Terintegrasi
                     </span>
                   </div>
                   <div className="flex items-center justify-between py-3 text-xs sm:text-sm">
-                    <span className="text-slate-500 flex items-center gap-2 font-semibold">
-                      <Car className="w-4 h-4 text-teal-600" /> Armada Kendaraan Setda
+                    <span className="text-slate-900 flex items-center gap-2 font-bold">
+                      <Car className="w-4 h-4 text-teal-700" /> Armada Kendaraan Setda
                     </span>
-                    <span className="font-extrabold text-slate-800 text-xs bg-blue-50 text-blue-800 px-2 py-0.5 rounded-md border border-blue-100">
+                    <span className="font-bold text-xs bg-blue-100 text-blue-950 px-2.5 py-0.5 rounded-full border border-blue-200">
                       Terkontrol Baik
                     </span>
                   </div>
                 </div>
                 
-                <div className="p-3 bg-amber-500/10 rounded-xl text-center border border-amber-500/20">
-                  <p className="text-xs font-bold text-amber-900 flex items-center justify-center gap-2">
-                    <PhoneCall className="w-3.5 h-3.5 text-amber-600 animate-bounce" /> Call Center Setda: {content.heroPhone}
+                <div className="p-3 bg-amber-100/95 rounded-xl text-center border border-amber-300">
+                  <p className="text-xs font-extrabold text-amber-950 flex items-center justify-center gap-2">
+                    <PhoneCall className="w-3.5 h-3.5 text-amber-700 animate-bounce" /> Call Center Setda: {content.heroPhone}
                   </p>
                 </div>
               </div>
