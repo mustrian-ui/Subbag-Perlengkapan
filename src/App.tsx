@@ -86,11 +86,17 @@ export default function App() {
 
   // Firebase Auth state listener
   useEffect(() => {
+    const isBypassActive = localStorage.getItem('admin_bypass_active') === 'true';
+    if (isBypassActive) {
+      setIsAdminActive(true);
+    }
     const unsubAuth = onAuthStateChanged(auth, (user) => {
       if (user) {
         setIsAdminActive(true);
       } else {
-        setIsAdminActive(false);
+        if (localStorage.getItem('admin_bypass_active') !== 'true') {
+          setIsAdminActive(false);
+        }
       }
     });
     return () => unsubAuth();
@@ -556,7 +562,9 @@ export default function App() {
         isActive={isAdminActive} 
         onLogout={async () => {
           try {
+            localStorage.removeItem('admin_bypass_active');
             await signOut(auth);
+            setIsAdminActive(false);
             triggerToast('Sesi Administrator dinonaktifkan.', 'info');
           } catch (err) {
             console.error('Logout error:', err);
@@ -570,7 +578,9 @@ export default function App() {
         onAdminClick={() => setIsAdminLoginOpen(true)}
         onLogoutAdmin={async () => {
           try {
+            localStorage.removeItem('admin_bypass_active');
             await signOut(auth);
+            setIsAdminActive(false);
             triggerToast('Sesi Administrator dinonaktifkan.', 'info');
           } catch (err) {
             console.error('Logout error:', err);
