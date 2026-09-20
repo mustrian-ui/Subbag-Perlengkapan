@@ -41,6 +41,16 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // SajiRapat (Fasilitasi Konsumsi Rapat) list
+    match /sajirapat/{sajirapatId} {
+      allow read, write: if true;
+    }
+
+    // PetaCendera (Permintaan & Pengelolaan Cinderamata) list
+    match /cinderamata/{cinderamataId} {
+      allow read, write: if true;
+    }
+
     // Schedules (Jadwal Gedung GSG) list
     match /schedules/{scheduleId} {
       allow read, write: if true;

@@ -97,6 +97,53 @@
       },
       "required": ["id", "barang", "jumlah", "status"]
     },
+    "SajiRapatRequest": {
+      "title": "SajiRapatRequest",
+      "description": "SajiRapat official meeting food & beverage catering requests",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "acara": { "type": "string" },
+        "tanggal": { "type": "string" },
+        "waktu": { "type": "string" },
+        "lokasi": { "type": "string" },
+        "pemohon": { "type": "string" },
+        "nip": { "type": "string" },
+        "kontak": { "type": "string" },
+        "instansi": { "type": "string" },
+        "porsi": { "type": "string" },
+        "jenisKonsumsi": { "type": "string" },
+        "catatan": { "type": "string" },
+        "status": { "type": "string" },
+        "documentUrl": { "type": "string" },
+        "documentName": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "acara", "tanggal", "waktu", "pemohon", "instansi", "porsi", "jenisKonsumsi", "status"]
+    },
+    "CinderamataRequest": {
+      "title": "CinderamataRequest",
+      "description": "PetaCendera souvenir and honorary plaques requests",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "keperluan": { "type": "string" },
+        "tanggalPerlu": { "type": "string" },
+        "pemohon": { "type": "string" },
+        "nip": { "type": "string" },
+        "kontak": { "type": "string" },
+        "instansi": { "type": "string" },
+        "penerima": { "type": "string" },
+        "jenisCinderamata": { "type": "string" },
+        "jumlah": { "type": "string" },
+        "catatan": { "type": "string" },
+        "status": { "type": "string" },
+        "documentUrl": { "type": "string" },
+        "documentName": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "keperluan", "tanggalPerlu", "pemohon", "instansi", "penerima", "jenisCinderamata", "jumlah", "status"]
+    },
     "HallSchedule": {
       "title": "HallSchedule",
       "description": "Jadwal Penggunaan Gedung Serba Guna",
@@ -152,6 +199,14 @@
     "logistics/{logisticsId}": {
       "schema": "LogisticsRequest",
       "description": "Logistics and item requirements"
+    },
+    "sajirapat/{sajirapatId}": {
+      "schema": "SajiRapatRequest",
+      "description": "Meeting catering and refreshments logistics"
+    },
+    "cinderamata/{cinderamataId}": {
+      "schema": "CinderamataRequest",
+      "description": "Souvenirs, plaques, and honorary gift allocations"
     },
     "schedules/{scheduleId}": {
       "schema": "HallSchedule",

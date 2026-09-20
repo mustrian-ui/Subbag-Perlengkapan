@@ -13,16 +13,18 @@ import {
   ExternalLink,
   Briefcase,
   Car,
-  Box,
+  Utensils,
+  Gift,
   MessageSquareText,
   Calendar,
   XCircle,
   Layers,
-  ChevronRight
+  ChevronRight,
+  Phone
 } from 'lucide-react';
-import { Booking, Vehicle, LogisticsRequest, Complaint } from '../types';
+import { Booking, Vehicle, LogisticsRequest, SajiRapatRequest, CinderamataRequest, Complaint } from '../types';
 
-export type AppFilterType = 'all' | 'siperum' | 'sipakar' | 'silogis' | 'lapor';
+export type AppFilterType = 'all' | 'siperum' | 'sipakar' | 'sajirapat' | 'petacendera' | 'lapor' | 'silogis';
 export type StatusFilterType = 'all' | 'pending' | 'process' | 'done' | 'rejected';
 
 interface ServiceReportsModalProps {
@@ -32,7 +34,9 @@ interface ServiceReportsModalProps {
   isAdminActive: boolean;
   bookings: Booking[];
   vehicles: Vehicle[];
-  logistics: LogisticsRequest[];
+  logistics: (LogisticsRequest | SajiRapatRequest)[];
+  sajiRapat?: SajiRapatRequest[];
+  cinderamata?: CinderamataRequest[];
   complaints: Complaint[];
   onUpdateBookingStatus: (id: string, status: string) => Promise<void>;
   onDeleteBooking: (id: string) => Promise<void>;
@@ -40,6 +44,8 @@ interface ServiceReportsModalProps {
   onDeleteVehicle: (id: string) => Promise<void>;
   onUpdateLogisticsStatus: (id: string, status: string) => Promise<void>;
   onDeleteLogistics: (id: string) => Promise<void>;
+  onUpdateCinderamataStatus?: (id: string, status: string) => Promise<void>;
+  onDeleteCinderamata?: (id: string) => Promise<void>;
   onUpdateComplaintStatus: (id: string, status: 'Masuk' | 'Diproses' | 'Selesai') => Promise<void>;
   onDeleteComplaint: (id: string) => Promise<void>;
   showToast: (msg: string, type: 'success' | 'error' | 'info') => void;
@@ -48,13 +54,14 @@ interface ServiceReportsModalProps {
 interface UnifiedReportItem {
   uid: string;
   sourceId: string;
-  appType: 'siperum' | 'sipakar' | 'silogis' | 'lapor';
+  appType: 'siperum' | 'sipakar' | 'sajirapat' | 'silogis' | 'petacendera' | 'lapor';
   appName: string;
   badgeLabel: string;
   title: string;
   requester: string;
   department: string;
   details: string;
+  phone?: string;
   dateStr: string;
   status: string;
   statusCategory: 'pending' | 'process' | 'done' | 'rejected';
@@ -71,6 +78,8 @@ export default function ServiceReportsModal({
   bookings,
   vehicles,
   logistics,
+  sajiRapat,
+  cinderamata = [],
   complaints,
   onUpdateBookingStatus,
   onDeleteBooking,
@@ -78,6 +87,8 @@ export default function ServiceReportsModal({
   onDeleteVehicle,
   onUpdateLogisticsStatus,
   onDeleteLogistics,
+  onUpdateCinderamataStatus,
+  onDeleteCinderamata,
   onUpdateComplaintStatus,
   onDeleteComplaint,
   showToast
@@ -116,6 +127,7 @@ export default function ServiceReportsModal({
       title: `${b.ruang} - ${b.agenda}`,
       requester: b.pemohon || 'Pejabat/Staff Setda',
       department: b.instansi || 'Organisasi Perangkat Daerah',
+      phone: b.kontak,
       details: `Jadwal: ${b.tanggal} (${b.waktu}) | Ruangan: ${b.ruang}`,
       dateStr: b.tanggal || (b.createdAt ? new Date(b.createdAt).toLocaleDateString('id-ID') : 'Terjadwal'),
       status: b.status,
@@ -144,6 +156,7 @@ export default function ServiceReportsModal({
       title: `${v.kendaraan} - ${v.tujuan}`,
       requester: v.pemohon || 'Driver/Pejabat',
       department: v.instansi || 'Bagian Terkait',
+      phone: v.kontak,
       details: `Armada: ${v.kendaraan} | Tujuan: ${v.tujuan}`,
       dateStr: v.createdAt ? new Date(v.createdAt).toLocaleDateString('id-ID') : 'Aktif',
       status: v.status,
@@ -154,35 +167,74 @@ export default function ServiceReportsModal({
     });
   });
 
-  // 3. SILOGIS
-  logistics.forEach(l => {
+  // 3. SajiRapat (replaces SILOGIS)
+  const cateringList = sajiRapat || (logistics as SajiRapatRequest[]);
+  cateringList.forEach(item => {
     let cat: 'pending' | 'process' | 'done' | 'rejected' = 'process';
-    const s = (l.status || '').toLowerCase();
+    const s = (item.status || '').toLowerCase();
     if (s.includes('selesai')) cat = 'done';
     else if (s.includes('tolak')) cat = 'rejected';
     else if (s.includes('menunggu')) cat = 'pending';
     else cat = 'process';
 
+    const titleText = item.acara 
+      ? `${item.acara} (${item.porsi || 'Porsi'})`
+      : `${item.barang || 'Bantuan Konsumsi'} (${item.jumlah || ''})`;
+
+    const detailText = item.acara
+      ? `Jenis: ${item.jenisKonsumsi || 'Konsumsi'} | Jadwal: ${item.tanggal || ''} ${item.waktu || ''} | Ruang: ${item.lokasi || ''}${item.catatan ? ` | Catatan: ${item.catatan}` : ''}`
+      : `Kebutuhan: ${item.barang} sejumlah ${item.jumlah}${item.kegiatan ? ` untuk ${item.kegiatan}` : ''}`;
+
     unifiedItems.push({
-      uid: `silogis_${l.id}`,
-      sourceId: l.id,
-      appType: 'silogis',
-      appName: 'SILOGIS',
-      badgeLabel: 'Logistik & ATK',
-      title: `${l.barang} (${l.jumlah})`,
-      requester: l.pemohon || 'Staff Pemohon',
-      department: l.instansi || 'Bagian Pemohon',
-      details: `Kebutuhan: ${l.barang} sejumlah ${l.jumlah}${l.kegiatan ? ` untuk ${l.kegiatan}` : ''}`,
-      dateStr: l.createdAt ? new Date(l.createdAt).toLocaleDateString('id-ID') : 'Aktif',
-      status: l.status,
+      uid: `sajirapat_${item.id}`,
+      sourceId: item.id,
+      appType: 'sajirapat',
+      appName: 'SajiRapat',
+      badgeLabel: 'Konsumsi Rapat',
+      title: titleText,
+      requester: item.pemohon || 'Staff Pemohon',
+      department: item.instansi || 'Bagian / OPD',
+      phone: item.kontak,
+      details: detailText,
+      dateStr: item.tanggal || (item.createdAt ? new Date(item.createdAt).toLocaleDateString('id-ID') : 'Aktif'),
+      status: item.status,
       statusCategory: cat,
-      documentUrl: l.documentUrl,
-      documentName: l.documentName,
-      raw: l
+      documentUrl: item.documentUrl,
+      documentName: item.documentName,
+      raw: item
     });
   });
 
-  // 4. LAPOR-RT
+  // 4. PetaCendera (Permintaan & Pengelolaan Cinderamata)
+  cinderamata.forEach(c => {
+    let cat: 'pending' | 'process' | 'done' | 'rejected' = 'pending';
+    const s = (c.status || '').toLowerCase();
+    if (s.includes('selesai')) cat = 'done';
+    else if (s.includes('tolak')) cat = 'rejected';
+    else if (s.includes('setuju') || s.includes('persiap') || s.includes('proses')) cat = 'process';
+    else cat = 'pending';
+
+    unifiedItems.push({
+      uid: `cinderamata_${c.id}`,
+      sourceId: c.id,
+      appType: 'petacendera',
+      appName: 'PetaCendera',
+      badgeLabel: 'Cinderamata & Souvenir',
+      title: `${c.jenisCinderamata} (${c.jumlah}) - Penerima: ${c.penerima}`,
+      requester: `${c.pemohon}${c.nip ? ` (NIP: ${c.nip})` : ''}`,
+      department: c.instansi,
+      phone: c.kontak,
+      details: `Keperluan: ${c.keperluan} | Tanggal Diperlukan: ${c.tanggalPerlu} | Tamu/Penerima: ${c.penerima}${c.catatan ? ` | Catatan: ${c.catatan}` : ''}`,
+      dateStr: c.tanggalPerlu || (c.createdAt ? new Date(c.createdAt).toLocaleDateString('id-ID') : 'Aktif'),
+      status: c.status,
+      statusCategory: cat,
+      documentUrl: c.documentUrl,
+      documentName: c.documentName,
+      raw: c
+    });
+  });
+
+  // 5. LAPOR-RT
   complaints.forEach(c => {
     let cat: 'pending' | 'process' | 'done' | 'rejected' = 'pending';
     if (c.status === 'Selesai') cat = 'done';
@@ -213,6 +265,9 @@ export default function ServiceReportsModal({
   // Metrics across currently selected app filter
   const itemsInCurrentApp = unifiedItems.filter(item => {
     if (appFilter === 'all') return true;
+    if (appFilter === 'sajirapat' || appFilter === 'silogis') {
+      return item.appType === 'sajirapat' || item.appType === 'silogis';
+    }
     return item.appType === appFilter;
   });
 
@@ -246,8 +301,12 @@ export default function ServiceReportsModal({
         await onUpdateBookingStatus(item.sourceId, newStatus);
       } else if (item.appType === 'sipakar') {
         await onUpdateVehicleStatus(item.sourceId, newStatus);
-      } else if (item.appType === 'silogis') {
+      } else if (item.appType === 'sajirapat' || item.appType === 'silogis') {
         await onUpdateLogisticsStatus(item.sourceId, newStatus);
+      } else if (item.appType === 'petacendera') {
+        if (onUpdateCinderamataStatus) {
+          await onUpdateCinderamataStatus(item.sourceId, newStatus);
+        }
       } else if (item.appType === 'lapor') {
         await onUpdateComplaintStatus(item.sourceId, newStatus as any);
       }
@@ -268,8 +327,12 @@ export default function ServiceReportsModal({
         await onDeleteBooking(item.sourceId);
       } else if (item.appType === 'sipakar') {
         await onDeleteVehicle(item.sourceId);
-      } else if (item.appType === 'silogis') {
+      } else if (item.appType === 'sajirapat' || item.appType === 'silogis') {
         await onDeleteLogistics(item.sourceId);
+      } else if (item.appType === 'petacendera') {
+        if (onDeleteCinderamata) {
+          await onDeleteCinderamata(item.sourceId);
+        }
       } else if (item.appType === 'lapor') {
         await onDeleteComplaint(item.sourceId);
       }
@@ -337,7 +400,7 @@ export default function ServiceReportsModal({
             }`}
           >
             <Briefcase className="w-3.5 h-3.5 text-teal-500" />
-            <span>SIPERUM - Ruangan ({bookings.length})</span>
+            <span>SIPERUM - Ruang ({bookings.length})</span>
           </button>
 
           <button
@@ -355,15 +418,28 @@ export default function ServiceReportsModal({
 
           <button
             type="button"
-            onClick={() => setAppFilter('silogis')}
+            onClick={() => setAppFilter('sajirapat')}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
-              appFilter === 'silogis'
-                ? 'bg-rose-700 text-white shadow'
-                : 'bg-white text-rose-800 hover:bg-rose-50 border border-rose-200'
+              appFilter === 'sajirapat' || appFilter === 'silogis'
+                ? 'bg-orange-700 text-white shadow'
+                : 'bg-white text-orange-800 hover:bg-orange-50 border border-orange-200'
             }`}
           >
-            <Box className="w-3.5 h-3.5 text-rose-500" />
-            <span>SILOGIS - ATK ({logistics.length})</span>
+            <Utensils className="w-3.5 h-3.5 text-orange-500" />
+            <span>SajiRapat - Konsumsi ({cateringList.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAppFilter('petacendera')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+              appFilter === 'petacendera'
+                ? 'bg-purple-700 text-white shadow'
+                : 'bg-white text-purple-800 hover:bg-purple-50 border border-purple-200'
+            }`}
+          >
+            <Gift className="w-3.5 h-3.5 text-purple-500" />
+            <span>PetaCendera - Cinderamata ({cinderamata.length})</span>
           </button>
 
           <button
@@ -371,11 +447,11 @@ export default function ServiceReportsModal({
             onClick={() => setAppFilter('lapor')}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
               appFilter === 'lapor'
-                ? 'bg-blue-700 text-white shadow'
-                : 'bg-white text-blue-800 hover:bg-blue-50 border border-blue-200'
+                ? 'bg-rose-700 text-white shadow'
+                : 'bg-white text-rose-800 hover:bg-rose-50 border border-rose-200'
             }`}
           >
-            <MessageSquareText className="w-3.5 h-3.5 text-blue-500" />
+            <MessageSquareText className="w-3.5 h-3.5 text-rose-500" />
             <span>LAPOR-RT - Aduan ({complaints.length})</span>
           </button>
         </div>
@@ -527,18 +603,22 @@ export default function ServiceReportsModal({
                   ? 'border-teal-500/40 bg-teal-50/20'
                   : item.appType === 'sipakar'
                     ? 'border-amber-500/40 bg-amber-50/20'
-                    : item.appType === 'silogis'
-                      ? 'border-rose-500/40 bg-rose-50/20'
-                      : 'border-blue-500/40 bg-blue-50/20';
+                    : item.appType === 'sajirapat' || item.appType === 'silogis'
+                      ? 'border-orange-500/40 bg-orange-50/20'
+                      : item.appType === 'petacendera'
+                        ? 'border-purple-500/40 bg-purple-50/20'
+                        : 'border-rose-500/40 bg-rose-50/20';
 
               const appBadge = 
                 item.appType === 'siperum'
                   ? 'bg-teal-100 text-teal-800 border-teal-200'
                   : item.appType === 'sipakar'
                     ? 'bg-amber-100 text-amber-800 border-amber-200'
-                    : item.appType === 'silogis'
-                      ? 'bg-rose-100 text-rose-800 border-rose-200'
-                      : 'bg-blue-100 text-blue-800 border-blue-200';
+                    : item.appType === 'sajirapat' || item.appType === 'silogis'
+                      ? 'bg-orange-100 text-orange-800 border-orange-200'
+                      : item.appType === 'petacendera'
+                        ? 'bg-purple-100 text-purple-800 border-purple-200'
+                        : 'bg-rose-100 text-rose-800 border-rose-200';
 
               return (
                 <div 
@@ -553,7 +633,8 @@ export default function ServiceReportsModal({
                       <span className={`px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider border flex items-center gap-1.5 ${appBadge}`}>
                         {item.appType === 'siperum' && <Briefcase className="w-3 h-3" />}
                         {item.appType === 'sipakar' && <Car className="w-3 h-3" />}
-                        {item.appType === 'silogis' && <Box className="w-3 h-3" />}
+                        {(item.appType === 'sajirapat' || item.appType === 'silogis') && <Utensils className="w-3 h-3" />}
+                        {item.appType === 'petacendera' && <Gift className="w-3 h-3" />}
                         {item.appType === 'lapor' && <MessageSquareText className="w-3 h-3" />}
                         <span>{item.appName}: {item.badgeLabel}</span>
                       </span>
@@ -610,15 +691,27 @@ export default function ServiceReportsModal({
                         </button>
                       )}
 
-                      {item.appType === 'silogis' && item.status !== 'Diproses' && (
+                      {(item.appType === 'sajirapat' || item.appType === 'silogis') && item.status !== 'Diproses' && item.status !== 'Disiapkan' && (
                         <button
                           type="button"
                           disabled={loadingId === item.uid}
-                          onClick={() => handleAction(item, 'Diproses')}
-                          className="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-blue-600 hover:bg-blue-700 text-white transition cursor-pointer shadow-sm active:scale-95"
-                          title="Mulai Proses Logistik"
+                          onClick={() => handleAction(item, 'Disiapkan')}
+                          className="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-orange-600 hover:bg-orange-700 text-white transition cursor-pointer shadow-sm active:scale-95"
+                          title="Siapkan Konsumsi Rapat"
                         >
-                          Proses Barang
+                          Siapkan Konsumsi
+                        </button>
+                      )}
+
+                      {item.appType === 'petacendera' && item.status !== 'Diproses' && item.status !== 'Dipersiapkan' && (
+                        <button
+                          type="button"
+                          disabled={loadingId === item.uid}
+                          onClick={() => handleAction(item, 'Dipersiapkan')}
+                          className="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-purple-600 hover:bg-purple-700 text-white transition cursor-pointer shadow-sm active:scale-95"
+                          title="Siapkan Cinderamata"
+                        >
+                          Siapkan Souvenir
                         </button>
                       )}
 
@@ -647,7 +740,7 @@ export default function ServiceReportsModal({
                         </button>
                       )}
 
-                      {/* Action 3: Tolak (untuk reservasi/kendaraan/logistik) */}
+                      {/* Action 3: Tolak (untuk reservasi/kendaraan/logistik/cinderamata) */}
                       {item.status !== 'Ditolak' && item.appType !== 'lapor' && (
                         <button
                           type="button"

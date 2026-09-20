@@ -10,16 +10,9 @@ import {
   Edit2, 
   Plus, 
   X, 
-  Calendar, 
-  Clock, 
-  CheckCircle, 
-  AlertCircle,
-  Upload,
-  Paperclip,
-  Loader2,
-  ExternalLink,
-  MessageSquareText,
-  Layers
+  Layers,
+  Utensils,
+  Gift
 } from 'lucide-react';
 import { 
   Application, 
@@ -27,15 +20,12 @@ import {
   Booking, 
   Vehicle, 
   LogisticsRequest,
-  Complaint
+  Complaint,
+  SajiRapatRequest,
+  CinderamataRequest
 } from '../types';
-import { doc, setDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
-import { 
-  getAccessToken, 
-  getOrCreateDriveFolder, 
-  uploadFileToDrive 
-} from '../lib/googleSheets';
+import { AppFilterType } from './ServiceReportsModal';
+import ServicePortalModal, { getServiceType } from './ServicePortalModal';
 
 interface AppGridProps {
   isAdminActive: boolean;
@@ -59,13 +49,23 @@ interface AppGridProps {
   onUpdateLogisticsStatus?: (id: string, status: string) => Promise<void>;
   onDeleteLogistics?: (id: string) => Promise<void>;
 
+  sajiRapat?: SajiRapatRequest[];
+  onAddSajiRapat?: (req: SajiRapatRequest) => void;
+  onUpdateSajiRapatStatus?: (id: string, status: string) => Promise<void>;
+  onDeleteSajiRapat?: (id: string) => Promise<void>;
+
+  cinderamata?: CinderamataRequest[];
+  onAddCinderamata?: (req: CinderamataRequest) => void;
+  onUpdateCinderamataStatus?: (id: string, status: string) => Promise<void>;
+  onDeleteCinderamata?: (id: string) => Promise<void>;
+
   complaints?: Complaint[];
   onOpenComplaintsModal?: () => void;
   onAddComplaint?: (complaint: Complaint) => void;
   onUpdateComplaintStatus?: (id: string, status: 'Masuk' | 'Diproses' | 'Selesai') => Promise<void>;
   onDeleteComplaint?: (id: string) => Promise<void>;
 
-  onOpenServiceReportsModal?: (appFilter?: 'all' | 'siperum' | 'sipakar' | 'silogis' | 'lapor') => void;
+  onOpenServiceReportsModal?: (appFilter?: AppFilterType) => void;
   
   showToast: (msg: string, type: 'success' | 'error' | 'info') => void;
 }
@@ -78,6 +78,12 @@ export function renderAppIcon(iconName: string, className: string = "w-6 h-6") {
   }
   if (normalized.includes('car') || normalized.includes('vehicle') || normalized.includes('pakara')) {
     return <Car className={className} />;
+  }
+  if (normalized.includes('utensil') || normalized.includes('food') || normalized.includes('saji') || normalized.includes('catering') || normalized.includes('konsumsi')) {
+    return <Utensils className={className} />;
+  }
+  if (normalized.includes('gift') || normalized.includes('cinderamata') || normalized.includes('cendera') || normalized.includes('souvenir')) {
+    return <Gift className={className} />;
   }
   if (normalized.includes('box') || normalized.includes('package') || normalized.includes('logis')) {
     return <Box className={className} />;
@@ -110,6 +116,16 @@ export default function AppGrid({
   onUpdateLogisticsStatus,
   onDeleteLogistics,
 
+  sajiRapat = [],
+  onAddSajiRapat,
+  onUpdateSajiRapatStatus,
+  onDeleteSajiRapat,
+
+  cinderamata = [],
+  onAddCinderamata,
+  onUpdateCinderamataStatus,
+  onDeleteCinderamata,
+
   complaints = [],
   onOpenComplaintsModal,
   onAddComplaint,
@@ -134,115 +150,7 @@ export default function AppGrid({
   const [appFormIcon, setAppFormIcon] = useState('couch');
   const [appFormDesc, setAppFormDesc] = useState('');
 
-  // MICRO-APP FORMS LOCAL STATE
-  const [isUploading, setIsUploading] = useState(false);
-
-  // SIPERUM states
-  const [sipRuang, setSipRuang] = useState('Gedung Lubung');
-  const [sipTgl, setSipTgl] = useState('');
-  const [sipJam, setSipJam] = useState('');
-  const [sipAgenda, setSipAgenda] = useState('');
-  const [sipPemohon, setSipPemohon] = useState('');
-  const [sipInstansi, setSipInstansi] = useState('');
-  const [sipFile, setSipFile] = useState<File | null>(null);
-  const [sipDragOver, setSipDragOver] = useState(false);
-
-  // SIPAKAR states
-  const [sipCarUnit, setSipCarUnit] = useState('');
-  const [sipCarDest, setSipCarDest] = useState('');
-  const [sipCarUser, setSipCarUser] = useState('');
-  const [sipCarInstansi, setSipCarInstansi] = useState('');
-  const [sipCarFile, setSipCarFile] = useState<File | null>(null);
-  const [sipCarDragOver, setSipCarDragOver] = useState(false);
-
-  // SILOGIS states
-  const [silItem, setSilItem] = useState('Kursi');
-  const [silQty, setSilQty] = useState('');
-  const [silDest, setSilDest] = useState('');
-  const [silPemohon, setSilPemohon] = useState('');
-  const [silInstansi, setSilInstansi] = useState('');
-  const [silFile, setSilFile] = useState<File | null>(null);
-  const [silDragOver, setSilDragOver] = useState(false);
-
-  // LAPOR-RT states
-  const [lapLoc, setLapLoc] = useState('');
-  const [lapProblem, setLapProblem] = useState('');
-  const [lapMemo, setLapMemo] = useState('');
-  const [lapBagian, setLapBagian] = useState('');
-  const [lapPemohon, setLapPemohon] = useState('');
-
-  // Renders a high-quality upload box that handles dragging and clicking
-  const renderFileUpload = (
-    file: File | null,
-    setFile: (f: File | null) => void,
-    dragOver: boolean,
-    setDragOver: (b: boolean) => void,
-    accentColor: string = 'border-teal-300 hover:border-teal-500 hover:bg-slate-50'
-  ) => {
-    return (
-      <div className="space-y-1.5 mt-2">
-        <label className="block text-xs font-black text-slate-700 flex items-center justify-between">
-          <span className="uppercase tracking-wider">Surat Permohonan / Dokumen Resmi</span>
-          <span className="text-[10px] font-extrabold text-rose-500 uppercase">Wajib Diunggah</span>
-        </label>
-        
-        <div
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragOver(false);
-            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-              setFile(e.dataTransfer.files[0]);
-              showToast(`Berkas ${e.dataTransfer.files[0].name} terpilih!`, 'info');
-            }
-          }}
-          className={`border-2 border-dashed rounded-xl p-4 text-center transition-all duration-200 relative ${
-            dragOver 
-              ? 'border-emerald-500 bg-emerald-50/20 shadow-inner' 
-              : file 
-              ? 'border-emerald-400 bg-emerald-50/5' 
-              : `border-slate-200 bg-white ${accentColor}`
-          }`}
-        >
-          <input
-            type="file"
-            onChange={(e) => {
-              if (e.target.files && e.target.files[0]) {
-                setFile(e.target.files[0]);
-                showToast(`Berkas ${e.target.files[0].name} terpilih!`, 'info');
-              }
-            }}
-            accept=".pdf,image/*,.doc,.docx"
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-          />
-          <div className="flex flex-col items-center justify-center gap-1.5">
-            <div className={`p-2 bg-slate-50 border border-slate-100 rounded-xl shadow-sm ${file ? 'text-emerald-600' : 'text-slate-400'}`}>
-              <Upload className="w-4 h-4" />
-            </div>
-            {file ? (
-              <div className="space-y-0.5">
-                <p className="text-xs font-bold text-slate-800 max-w-[200px] sm:max-w-[250px] truncate mx-auto flex items-center gap-1 justify-center">
-                  <Paperclip className="w-3 h-3 text-emerald-500 shrink-0" />
-                  <span>{file.name}</span>
-                </p>
-                <p className="text-[10px] text-emerald-600 font-black bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full inline-block">
-                  {(file.size / (1024 * 1024)).toFixed(2)} MB • Siap
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-0.5">
-                <p className="text-xs font-extrabold text-slate-700">Tarik dokumen ke sini atau klik pilih</p>
-                <p className="text-[10px] text-slate-400 leading-relaxed">PDF, JPG, PNG, DOCX (Maks 5MB)</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Trigger admin add view
+  // Admin App Form actions
   const triggerAddApp = () => {
     setEditingApp(null);
     setAppFormName('');
@@ -252,7 +160,6 @@ export default function AppGrid({
     setIsAppFormOpen(true);
   };
 
-  // Trigger admin edit view
   const triggerEditApp = (app: Application, e: MouseEvent) => {
     e.stopPropagation();
     setEditingApp(app);
@@ -263,265 +170,44 @@ export default function AppGrid({
     setIsAppFormOpen(true);
   };
 
+  const handleRemoveApp = (id: string, e: MouseEvent) => {
+    e.stopPropagation();
+    if (window.confirm('Apakah Anda yakin ingin menghapus tautan aplikasi ini dari dashboard portal?')) {
+      onDeleteApplication(id);
+      showToast('Aplikasi dihapus dari dashboard.', 'info');
+    }
+  };
+
   const handleAdminAppSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!appFormName.trim() || !appFormDesc.trim()) {
-      showToast('Harap isi semua kolom formulir!', 'error');
+    if (!appFormName.trim()) {
+      showToast('Nama aplikasi tidak boleh kosong!', 'error');
       return;
     }
 
-    const appData: Application = {
-      id: editingApp ? editingApp.id : `app_${Date.now()}`,
-      title: appFormName,
-      category: appFormCategory,
-      icon: appFormIcon,
-      desc: appFormDesc
-    };
-
     if (editingApp) {
-      onEditApplication(appData);
-      showToast('Aplikasi layanan berhasil diperbaharui!', 'success');
+      const updated: Application = {
+        ...editingApp,
+        title: appFormName.trim(),
+        category: appFormCategory,
+        icon: appFormIcon,
+        desc: appFormDesc.trim()
+      };
+      onEditApplication(updated);
+      showToast(`Aplikasi ${appFormName} berhasil diperbarui!`, 'success');
     } else {
-      onAddApplication(appData);
-      showToast('Layanan aplikasi baru sukses didaftarkan!', 'success');
+      const newApp: Application = {
+        id: `app_${Date.now()}`,
+        title: appFormName.trim(),
+        category: appFormCategory,
+        icon: appFormIcon,
+        desc: appFormDesc.trim()
+      };
+      onAddApplication(newApp);
+      showToast(`Aplikasi ${appFormName} berhasil ditambahkan!`, 'success');
     }
 
     setIsAppFormOpen(false);
-  };
-
-  const handleRemoveApp = (id: string, e: MouseEvent) => {
-    e.stopPropagation();
-    const confirmDelete = window.confirm('Apakah Anda yakin ingin menghapus portal layanan ini dari dasbor?');
-    if (confirmDelete) {
-      onDeleteApplication(id);
-      showToast('Aplikasi berhasil dihapus dari daftar.', 'info');
-    }
-  };
-
-  // MICRO-APP FORM SUBMISSIONS
-  const handleSiperumSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!sipTgl || !sipJam || !sipAgenda || !sipPemohon || !sipInstansi) {
-      showToast('Harap lengkapi isian kosong!', 'error');
-      return;
-    }
-    if (!sipFile) {
-      showToast('Harap unggah Surat Permohonan terlebih dahulu!', 'error');
-      return;
-    }
-
-    setIsUploading(true);
-    let finalDocUrl = '';
-    let finalDocName = '';
-
-    try {
-      const token = await getAccessToken();
-      if (token) {
-        showToast('Mengunggah Surat Permohonan ke Google Drive...', 'info');
-        const folderId = await getOrCreateDriveFolder(token);
-        const uploadRes = await uploadFileToDrive(token, folderId, sipFile);
-        finalDocUrl = uploadRes.webViewLink;
-        finalDocName = uploadRes.name;
-      } else {
-        finalDocUrl = URL.createObjectURL(sipFile);
-        finalDocName = sipFile.name;
-        showToast('Dokumen tersimpan di browser (GDrive Admin belum siap).', 'info');
-      }
-    } catch (err) {
-      console.error('Failed to sync to Google Drive:', err);
-      // Fallback
-      finalDocUrl = URL.createObjectURL(sipFile);
-      finalDocName = sipFile.name;
-      showToast('Upload Google Drive gagal, menyimpan berkas secara lokal.', 'info');
-    } finally {
-      setIsUploading(false);
-    }
-
-    const newBooking: Booking = {
-      id: `book_${Date.now()}`,
-      ruang: sipRuang,
-      tanggal: sipTgl,
-      waktu: sipJam,
-      agenda: sipAgenda,
-      pemohon: sipPemohon,
-      instansi: sipInstansi,
-      status: 'Menunggu Konfirmasi',
-      documentUrl: finalDocUrl,
-      documentName: finalDocName
-    };
-
-    onAddBooking(newBooking);
-    showToast(`Reservasi ${sipRuang} sukses dikirim ke Subbag Rumah Tangga!`, 'success');
-    
-    // reset
-    setSipTgl('');
-    setSipJam('');
-    setSipAgenda('');
-    setSipPemohon('');
-    setSipInstansi('');
-    setSipFile(null);
-    setActiveMicroApp(null);
-  };
-
-  const handleSipakarSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!sipCarUnit || !sipCarDest || !sipCarUser || !sipCarInstansi) {
-      showToast('Harap lengkapi isian kosong!', 'error');
-      return;
-    }
-    if (!sipCarFile) {
-      showToast('Harap unggah Surat Tugas / Surat Permohonan Kendaraan!', 'error');
-      return;
-    }
-
-    setIsUploading(true);
-    let finalDocUrl = '';
-    let finalDocName = '';
-
-    try {
-      const token = await getAccessToken();
-      if (token) {
-        showToast('Mengunggah Surat Tugas ke Google Drive...', 'info');
-        const folderId = await getOrCreateDriveFolder(token);
-        const uploadRes = await uploadFileToDrive(token, folderId, sipCarFile);
-        finalDocUrl = uploadRes.webViewLink;
-        finalDocName = uploadRes.name;
-      } else {
-        finalDocUrl = URL.createObjectURL(sipCarFile);
-        finalDocName = sipCarFile.name;
-        showToast('Dokumen tersimpan di browser (GDrive Admin belum siap).', 'info');
-      }
-    } catch (err) {
-      console.error('Failed to sync vehicle doc to Google Drive:', err);
-      finalDocUrl = URL.createObjectURL(sipCarFile);
-      finalDocName = sipCarFile.name;
-      showToast('Upload Google Drive gagal, menyimpan dokumen secara lokal.', 'info');
-    } finally {
-      setIsUploading(false);
-    }
-
-    const newVehicleReq: Vehicle = {
-      id: `veh_${Date.now()}`,
-      kendaraan: sipCarUnit,
-      pemohon: sipCarUser,
-      instansi: sipCarInstansi,
-      tujuan: sipCarDest,
-      status: 'Menunggu Validasi',
-      documentUrl: finalDocUrl,
-      documentName: finalDocName
-    };
-
-    onAddVehicle(newVehicleReq);
-    showToast(`Permohonan armada ${sipCarUnit} berhasil didaftarkan!`, 'success');
-    
-    // reset
-    setSipCarUnit('');
-    setSipCarDest('');
-    setSipCarUser('');
-    setSipCarInstansi('');
-    setSipCarFile(null);
-    setActiveMicroApp(null);
-  };
-
-  const handleSilogisSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!silItem || !silQty || !silDest || !silPemohon || !silInstansi) {
-      showToast('Harap lengkapi data barang dan pemohon!', 'error');
-      return;
-    }
-    if (!silFile) {
-      showToast('Harap unggah Surat Permintaan Logistik!', 'error');
-      return;
-    }
-
-    setIsUploading(true);
-    let finalDocUrl = '';
-    let finalDocName = '';
-
-    try {
-      const token = await getAccessToken();
-      if (token) {
-        showToast('Mengunggah Surat Permintaan ke Google Drive...', 'info');
-        const folderId = await getOrCreateDriveFolder(token);
-        const uploadRes = await uploadFileToDrive(token, folderId, silFile);
-        finalDocUrl = uploadRes.webViewLink;
-        finalDocName = uploadRes.name;
-      } else {
-        finalDocUrl = URL.createObjectURL(silFile);
-        finalDocName = silFile.name;
-        showToast('Dokumen tersimpan di browser (GDrive Admin belum siap).', 'info');
-      }
-    } catch (err) {
-      console.error('Failed to sync logistics file to Google Drive:', err);
-      finalDocUrl = URL.createObjectURL(silFile);
-      finalDocName = silFile.name;
-      showToast('Upload Google Drive gagal, menyimpan berkas secara lokal.', 'info');
-    } finally {
-      setIsUploading(false);
-    }
-
-    const newReq: LogisticsRequest = {
-      id: `log_${Date.now()}`,
-      barang: silItem,
-      jumlah: silQty,
-      kegiatan: silDest,
-      pemohon: silPemohon,
-      instansi: silInstansi,
-      status: 'Diproses',
-      documentUrl: finalDocUrl,
-      documentName: finalDocName
-    };
-
-    onAddLogistics(newReq);
-    showToast(`Permintaan barang ${silItem} telah dikirim ke gudang perlengkapan!`, 'success');
-
-    // reset
-    setSilItem('Kursi');
-    setSilQty('');
-    setSilDest('');
-    setSilPemohon('');
-    setSilInstansi('');
-    setSilFile(null);
-    setActiveMicroApp(null);
-  };
-
-  const handleLaporSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!lapLoc || !lapProblem || !lapBagian || !lapPemohon) {
-      showToast('Harap lengkapi semua isian kosong!', 'error');
-      return;
-    }
-
-    const complaintId = `comp_${Date.now()}`;
-    const newComplaint: Complaint = {
-      id: complaintId,
-      name: lapPemohon.trim(),
-      bagian: lapBagian.trim(),
-      location: lapLoc.trim(),
-      type: 'Kerusakan Fasilitas',
-      message: `${lapProblem.trim()}${lapMemo ? ` (Catatan: ${lapMemo.trim()})` : ''}`,
-      status: 'Masuk',
-      createdAt: new Date().toISOString()
-    };
-
-    try {
-      await setDoc(doc(db, 'complaints', complaintId), newComplaint);
-      if (onAddComplaint) {
-        onAddComplaint(newComplaint);
-      }
-      showToast('Laporan kerusakan terkirim dan tersimpan di database Subbag RT!', 'success');
-    } catch (err) {
-      console.error('Failed to submit lapor:', err);
-      showToast('Gagal menyimpan laporan ke server.', 'error');
-    }
-    
-    // reset
-    setLapLoc('');
-    setLapProblem('');
-    setLapMemo('');
-    setLapBagian('');
-    setLapPemohon('');
-    setActiveMicroApp(null);
   };
 
   // Filter application cards based on selection
@@ -551,17 +237,19 @@ export default function AppGrid({
             </h2>
             <div className="w-16 h-1 bg-teal-600 rounded-full"></div>
             <p className="text-slate-500 max-w-xl text-xs sm:text-sm md:text-base leading-relaxed">
-              Gunakan portal di bawah ini untuk memesan ruang rapat Setda, mengesahkan armada operasional, meminta ATK logistik, dan melaporkan aduan kerusakan.
+              Subbag Rumah Tangga &amp; Perlengkapan Setda Kota Tarakan — Gunakan portal di bawah ini untuk reservasi ruang rapat, peminjaman kendaraan dinas, permohonan konsumsi rapat, permintaan cinderamata daerah, logistik ATK, serta aduan perbaikan fasilitas.
             </p>
           </div>
           
           {/* Filtering Categories Panel */}
           <div className="flex flex-wrap gap-2 self-start md:self-end">
             {[
-              { id: 'all', label: 'Semu' },
-              { id: 'internal', label: 'Fasilitas & Ruang' },
-              { id: 'logistics', label: 'Arsip Logistik' },
-              { id: 'public', label: 'Form Pengaduan' }
+              { id: 'all', label: 'Semua Layanan' },
+              { id: 'internal', label: 'Ruang & Kendaraan' },
+              { id: 'consumption', label: 'Konsumsi Rapat' },
+              { id: 'souvenir', label: 'Cinderamata' },
+              { id: 'logistics', label: 'Logistik & ATK' },
+              { id: 'public', label: 'LAPOR-RT' }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -595,10 +283,16 @@ export default function AppGrid({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredApps.map((app) => {
             // Distinct decorative styling for each app category
-            let badgeStyle = 'bg-teal-55 bg-teal-50 text-teal-800 border-teal-100';
+            let badgeStyle = 'bg-teal-50 text-teal-800 border-teal-100';
             let iconBoxStyle = 'bg-teal-500/10 text-teal-700 border-teal-500/15';
 
-            if (app.category === 'logistics') {
+            if (app.category === 'consumption') {
+              badgeStyle = 'bg-orange-50 text-orange-800 border-orange-100';
+              iconBoxStyle = 'bg-orange-500/10 text-orange-600 border-orange-500/15';
+            } else if (app.category === 'souvenir') {
+              badgeStyle = 'bg-purple-50 text-purple-800 border-purple-100';
+              iconBoxStyle = 'bg-purple-500/10 text-purple-600 border-purple-500/15';
+            } else if (app.category === 'logistics') {
               badgeStyle = 'bg-amber-50 text-amber-800 border-amber-100';
               iconBoxStyle = 'bg-amber-500/10 text-amber-600 border-amber-500/15';
             } else if (app.category === 'public') {
@@ -638,7 +332,10 @@ export default function AppGrid({
                       {renderAppIcon(app.icon, "w-6 h-6")}
                     </div>
                     <span className={`px-2.5 py-1 text-[9px] font-black tracking-wider uppercase border rounded-full ${badgeStyle}`}>
-                      {app.category === 'internal' ? 'Fasilitas' : app.category === 'logistics' ? 'Logistik' : 'Aduan'}
+                      {app.category === 'internal' ? 'Fasilitas' : 
+                       app.category === 'consumption' ? 'Konsumsi' :
+                       app.category === 'souvenir' ? 'Cinderamata' :
+                       app.category === 'logistics' ? 'Logistik' : 'Aduan'}
                     </span>
                   </div>
                   
@@ -667,15 +364,10 @@ export default function AppGrid({
                   {isAdminActive && (
                     <button
                       onClick={() => {
-                        let filter: 'siperum' | 'sipakar' | 'silogis' | 'lapor' = 'siperum';
-                        if (app.id.includes('app_1')) filter = 'siperum';
-                        else if (app.id.includes('app_2')) filter = 'sipakar';
-                        else if (app.id.includes('app_3')) filter = 'silogis';
-                        else if (app.id.includes('app_4')) filter = 'lapor';
-
+                        const filter = getServiceType(app);
                         if (onOpenServiceReportsModal) {
                           onOpenServiceReportsModal(filter);
-                        } else if (app.id.includes('app_4') && onOpenComplaintsModal) {
+                        } else if (filter === 'lapor' && onOpenComplaintsModal) {
                           onOpenComplaintsModal();
                         }
                       }}
@@ -735,7 +427,7 @@ export default function AppGrid({
                   value={appFormName}
                   onChange={(e) => setAppFormName(e.target.value)}
                   required
-                  placeholder="Contoh: SIPAKAR (Layanan Kendaraan)"
+                  placeholder="Contoh: SajiRapat (Bantuan Konsumsi Rapat)"
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600 text-sm transition"
                 />
               </div>
@@ -751,6 +443,8 @@ export default function AppGrid({
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-emerald-600 focus:outline-none text-sm transition bg-white"
                   >
                     <option value="internal">Fasilitas & Ruangan</option>
+                    <option value="consumption">Konsumsi Rapat (SajiRapat)</option>
+                    <option value="souvenir">Cinderamata & Souvenir (PetaCendera)</option>
                     <option value="logistics">Arsip Logistik</option>
                     <option value="public">Form Pengaduan</option>
                   </select>
@@ -766,6 +460,8 @@ export default function AppGrid({
                   >
                     <option value="couch">Couch (Ruang Rapat)</option>
                     <option value="car">Car (Mobil Dinas)</option>
+                    <option value="utensils">Utensils (Konsumsi Rapat)</option>
+                    <option value="gift">Gift (Cinderamata / Souvenir)</option>
                     <option value="box">Box (ATK & Logistik)</option>
                     <option value="alert">Alert (Pengaduan/Lapor)</option>
                     <option value="file">File (Dokumen Lain)</option>
@@ -810,864 +506,38 @@ export default function AppGrid({
       {/* ======================================================== */}
       {/* 2. INTERACTIVE MODAL FOR MICRO-APPLICATIONS PORTAL */}
       {/* ======================================================== */}
-      {activeMicroApp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
-          <div className="bg-white rounded-3xl w-full max-w-4xl overflow-hidden shadow-2xl border border-slate-100 transform scale-100 transition-all duration-300 my-8">
-            
-            {/* Modal Header dynamically colored */}
-            <div className={`p-6 text-white relative flex items-center justify-between ${
-              activeMicroApp.category === 'internal' 
-                ? 'bg-gradient-to-r from-blue-900 to-teal-800' 
-                : activeMicroApp.category === 'logistics' 
-                  ? 'bg-gradient-to-r from-slate-900 to-amber-700' 
-                  : 'bg-gradient-to-r from-slate-900 to-rose-700'
-            }`}>
-              <div className="space-y-1">
-                <span className="text-[10px] uppercase font-black tracking-widest text-slate-200 block">
-                  {activeMicroApp.category === 'internal' ? 'Fasilitas & Penjadwalan' : activeMicroApp.category === 'logistics' ? 'Logistik Perlengkapan' : 'Pusat Pengaduan'}
-                </span>
-                <h3 className="text-lg sm:text-2xl font-black flex items-center gap-2 font-display">
-                  {renderAppIcon(activeMicroApp.icon, "w-6 h-6 sm:w-7 sm:h-7")} {activeMicroApp.title}
-                </h3>
-              </div>
-              <button
-                onClick={() => setActiveMicroApp(null)}
-                className="text-white/80 hover:text-white transition p-1.5 bg-white/10 rounded-xl"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Micro-App Content body */}
-            <div className="p-6 sm:p-8">
-              
-              {/* MICRO-APP 1: SIPERUM (Meeting room reservation) */}
-              {activeMicroApp.id.includes('app_1') && (
-                <div className="space-y-6">
-                  {isAdminActive && onOpenServiceReportsModal && (
-                    <div className="p-4 bg-gradient-to-r from-teal-950 to-slate-900 text-white rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md border border-teal-800/40">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-teal-500/20 text-teal-300 flex items-center justify-center font-black flex-shrink-0">
-                          <Briefcase className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="font-bold text-xs sm:text-sm">Pusat Tindakan &amp; Rekap Reservasi Ruangan (SIPERUM)</p>
-                          <p className="text-[11px] text-slate-300">Terdapat {bookings.length} permohonan ruangan yang masuk — Tampilan &amp; tindakan seperti LAPOR-RT</p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveMicroApp(null);
-                          onOpenServiceReportsModal('siperum');
-                        }}
-                        className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-extrabold text-xs shadow transition cursor-pointer flex items-center gap-1.5 flex-shrink-0"
-                      >
-                        <span>Buka Rekap &amp; Tindakan</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                  
-                  {/* Reservation Request Form */}
-                  <form onSubmit={handleSiperumSubmit} className="lg:col-span-5 space-y-4">
-                    <h4 className="font-extrabold text-xs uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2">
-                      Formulir Reservasi Ruangan
-                    </h4>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Pilih Ruang Rapat</label>
-                      <select
-                        value={sipRuang}
-                        onChange={(e) => setSipRuang(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-1 focus:ring-teal-500 focus:outline-none bg-white font-semibold text-slate-800"
-                      >
-                        <option value="Gedung Lubung">Gedung Lubung</option>
-                        <option value="Gedung Serbaguna">Gedung Serbaguna</option>
-                      </select>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">Tanggal</label>
-                        <input
-                          type="date"
-                          required
-                          value={sipTgl}
-                          onChange={(e) => setSipTgl(e.target.value)}
-                          className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-1 focus:ring-teal-500 focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">Jam Rapat / Kegiatan</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="e.g. 09:00 - 12:00 WITA"
-                          value={sipJam}
-                          onChange={(e) => setSipJam(e.target.value)}
-                          className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-1 focus:ring-teal-500 focus:outline-none"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Agenda / Nama Kegiatan</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="e.g. Rapat Koordinasi Anggaran"
-                        value={sipAgenda}
-                        onChange={(e) => setSipAgenda(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-1 focus:ring-teal-500 focus:outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Nama Pejabat / Staff Pemohon</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Contoh: Drs. Heri Supriyadi"
-                        value={sipPemohon}
-                        onChange={(e) => setSipPemohon(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-1 focus:ring-teal-500 focus:outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Dinas / Instansi</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Contoh: Dinas Komunikasi dan Informatika"
-                        value={sipInstansi}
-                        onChange={(e) => setSipInstansi(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-1 focus:ring-teal-500 focus:outline-none"
-                      />
-                    </div>
-
-                    {renderFileUpload(sipFile, setSipFile, sipDragOver, setSipDragOver, 'border-teal-200 hover:border-teal-500 hover:bg-slate-50')}
-
-                    <button
-                      type="submit"
-                      disabled={isUploading}
-                      className="w-full py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-extrabold shadow-md transition duration-200 cursor-pointer disabled:opacity-55 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-                    >
-                      {isUploading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                      <span>{isUploading ? 'Mengunggah Berkas...' : 'Kirim Formulir Pengajuan'}</span>
-                    </button>
-                  </form>
-
-                  {/* Active Calendars Table */}
-                  <div className="lg:col-span-7 space-y-4">
-                    <h4 className="font-extrabold text-xs uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2 flex items-center justify-between">
-                      <span>Jadwal Ruangan Aktif</span>
-                      <span className="text-[9px] bg-slate-100 tracking-wide text-slate-500 font-bold px-2 py-0.5 rounded-md">Live Update</span>
-                    </h4>
-
-                    <div className="overflow-hidden border border-slate-100 rounded-xl">
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="bg-slate-50 text-[10px] font-black text-slate-500 uppercase border-b border-slate-150">
-                            <th className="py-3 px-3">Nama Ruang</th>
-                            <th className="py-3 px-3">Tanggal / Waktu</th>
-                            <th className="py-3 px-3">Acara & Instansi</th>
-                            <th className="py-3 px-3 text-right">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {bookings.map((booking) => (
-                            <tr key={booking.id} className="text-xs text-slate-600 hover:bg-slate-50/50">
-                              <td className="py-3.5 px-3 font-extrabold text-slate-800">
-                                {booking.ruang}
-                              </td>
-                              <td className="py-3.5 px-3 whitespace-nowrap">
-                                <div className="flex items-center gap-1.5">
-                                  <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                                  <span>{booking.tanggal}</span>
-                                </div>
-                                <div className="flex items-center gap-1.5 text-[10px] text-slate-450 mt-0.5">
-                                  <Clock className="w-3 h-3 text-slate-400" />
-                                  <span>{booking.waktu}</span>
-                                </div>
-                              </td>
-                              <td className="py-3.5 px-3 font-medium">
-                                <div>{booking.agenda}</div>
-                                {(booking.pemohon || booking.instansi) && (
-                                  <div className="text-[10px] text-slate-400 mt-1 leading-normal font-semibold">
-                                    Pemohon: {booking.pemohon || '-'} ({booking.instansi || '-'})
-                                  </div>
-                                )}
-                                {booking.documentUrl && (
-                                  <a 
-                                    href={booking.documentUrl} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer" 
-                                    className="inline-flex items-center gap-1 mt-1 text-[10px] text-teal-650 hover:text-teal-800 font-extrabold bg-teal-50 hover:bg-teal-100 border border-teal-100 px-2 py-0.5 rounded-md transition duration-150 inline-flex"
-                                  >
-                                    <ExternalLink className="w-2.5 h-2.5 shrink-0" />
-                                    <span>Lihat Surat</span>
-                                  </a>
-                                )}
-                              </td>
-                              <td className="py-3.5 px-3 text-right">
-                                <div className="flex flex-col items-end gap-1.5">
-                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black ${
-                                    booking.status === 'Disetujui' 
-                                      ? 'bg-emerald-50 text-emerald-700' 
-                                      : booking.status === 'Selesai'
-                                        ? 'bg-blue-50 text-blue-700'
-                                        : booking.status === 'Ditolak'
-                                          ? 'bg-rose-50 text-rose-700'
-                                          : 'bg-amber-50 text-amber-700'
-                                  }`}>
-                                    {booking.status === 'Disetujui' || booking.status === 'Selesai' ? (
-                                      <CheckCircle className="w-2.5 h-2.5" />
-                                    ) : (
-                                      <Clock className="w-2.5 h-2.5 animate-pulse" />
-                                    )}
-                                    {booking.status}
-                                  </span>
-
-                                  {isAdminActive && onUpdateBookingStatus && (
-                                    <div className="flex items-center gap-1 mt-1">
-                                      {booking.status !== 'Disetujui' && (
-                                        <button
-                                          type="button"
-                                          onClick={() => onUpdateBookingStatus(booking.id, 'Disetujui')}
-                                          className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-teal-50 hover:bg-teal-100 text-teal-700 transition cursor-pointer"
-                                          title="Setujui Reservasi"
-                                        >
-                                          Setujui
-                                        </button>
-                                      )}
-                                      {booking.status !== 'Selesai' && (
-                                        <button
-                                          type="button"
-                                          onClick={() => onUpdateBookingStatus(booking.id, 'Selesai')}
-                                          className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition cursor-pointer"
-                                          title="Tandai Selesai"
-                                        >
-                                          Selesai
-                                        </button>
-                                      )}
-                                      {booking.status !== 'Ditolak' && (
-                                        <button
-                                          type="button"
-                                          onClick={() => onUpdateBookingStatus(booking.id, 'Ditolak')}
-                                          className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-500 transition cursor-pointer"
-                                          title="Tolak"
-                                        >
-                                          Tolak
-                                        </button>
-                                      )}
-                                      {onDeleteBooking && (
-                                        <button
-                                          type="button"
-                                          onClick={() => onDeleteBooking(booking.id)}
-                                          className="p-1 rounded text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                                          title="Hapus"
-                                        >
-                                          <Trash2 className="w-3 h-3" />
-                                        </button>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-            )}
-
-              {/* MICRO-APP 2: SIPAKAR (Vehicle log / booking) */}
-              {activeMicroApp.id.includes('app_2') && (
-                <div className="space-y-6">
-                  {isAdminActive && onOpenServiceReportsModal && (
-                    <div className="p-4 bg-gradient-to-r from-amber-950 to-slate-900 text-white rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md border border-amber-800/40">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center font-black flex-shrink-0">
-                          <Car className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="font-bold text-xs sm:text-sm">Pusat Tindakan &amp; Rekap Armada Dinas (SIPAKAR)</p>
-                          <p className="text-[11px] text-slate-300">Terdapat {vehicles.length} permohonan kendaraan yang masuk — Tampilan &amp; tindakan seperti LAPOR-RT</p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveMicroApp(null);
-                          onOpenServiceReportsModal('sipakar');
-                        }}
-                        className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-xs shadow transition cursor-pointer flex items-center gap-1.5 flex-shrink-0"
-                      >
-                        <span>Buka Rekap &amp; Tindakan</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                  
-                  {/* Request Form */}
-                  <form onSubmit={handleSipakarSubmit} className="lg:col-span-5 space-y-4">
-                    <h4 className="font-extrabold text-xs uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2">
-                      Peminjaman Kendaraan Dinas
-                    </h4>
-                    
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Kendaraan</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Contoh: Toyota Innova (KU 1045 A) / Avanza Silver"
-                        value={sipCarUnit}
-                        onChange={(e) => setSipCarUnit(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-1 focus:ring-teal-500 focus:outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Tujuan / Kegiatan</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Contoh: Kantor Gubernur Kaltara (Tanjung Selor)"
-                        value={sipCarDest}
-                        onChange={(e) => setSipCarDest(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-1 focus:ring-teal-500 focus:outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Nama Pejabat / Staff Pemohon</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Contoh: Drs. Heri Supriyadi (Asisten I)"
-                        value={sipCarUser}
-                        onChange={(e) => setSipCarUser(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-1 focus:ring-teal-500 focus:outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Dinas / Instansi</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Contoh: Dinas Perhubungan"
-                        value={sipCarInstansi}
-                        onChange={(e) => setSipCarInstansi(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-1 focus:ring-teal-500 focus:outline-none"
-                      />
-                    </div>
-
-                    {renderFileUpload(sipCarFile, setSipCarFile, sipCarDragOver, setSipCarDragOver, 'border-blue-200 hover:border-blue-500 hover:bg-slate-50')}
-
-                    <button
-                      type="submit"
-                      disabled={isUploading}
-                      className="w-full py-2.5 rounded-xl bg-blue-900 hover:bg-slate-900 text-white text-xs font-extrabold shadow-md transition disabled:opacity-55 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-                    >
-                      {isUploading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                      <span>{isUploading ? 'Mengunggah Berkas...' : 'Daftarkan Surat Jalan Dinas'}</span>
-                    </button>
-                  </form>
-
-                  {/* Active Vehicle Status List */}
-                  <div className="lg:col-span-7 space-y-4">
-                    <h4 className="font-extrabold text-xs uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2">
-                      Log Penggunaan Armada Aktif
-                    </h4>
-
-                    <div className="overflow-hidden border border-slate-100 rounded-xl">
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="bg-slate-50 text-[10px] font-black text-slate-500 uppercase border-b border-slate-150">
-                            <th className="py-3 px-3">Kendaraan</th>
-                            <th className="py-3 px-3">Nama Pemohon</th>
-                            <th className="py-3 px-3">Tujuan Organisasi</th>
-                            <th className="py-3 px-3 text-right">Status Jalan</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {vehicles.map((v) => (
-                            <tr key={v.id} className="text-xs text-slate-600 hover:bg-slate-50/50">
-                              <td className="py-3.5 px-3 font-extrabold text-slate-800">{v.kendaraan}</td>
-                              <td className="py-3.5 px-3">
-                                <div>{v.pemohon}</div>
-                                {v.instansi && (
-                                  <div className="text-[10px] text-slate-400 mt-0.5 font-semibold">{v.instansi}</div>
-                                )}
-                              </td>
-                              <td className="py-3.5 px-3 font-medium">
-                                <div>{v.tujuan}</div>
-                                {v.documentUrl && (
-                                  <a 
-                                    href={v.documentUrl} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer" 
-                                    className="inline-flex items-center gap-1 mt-1 text-[10px] text-blue-650 hover:text-blue-800 font-extrabold bg-blue-50 hover:bg-blue-100 border border-blue-100 px-2 py-0.5 rounded-md transition duration-150 inline-flex"
-                                  >
-                                    <ExternalLink className="w-2.5 h-2.5 shrink-0" />
-                                    <span>Lihat Surat</span>
-                                  </a>
-                                )}
-                              </td>
-                              <td className="py-3.5 px-3 text-right">
-                                <div className="flex flex-col items-end gap-1.5">
-                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black ${
-                                    v.status === 'Disetujui' 
-                                      ? 'bg-emerald-50 text-emerald-700' 
-                                      : v.status === 'Selesai'
-                                        ? 'bg-blue-50 text-blue-700'
-                                        : v.status === 'Ditolak'
-                                          ? 'bg-rose-50 text-rose-700'
-                                          : 'bg-amber-50 text-amber-700'
-                                  }`}>
-                                    {v.status === 'Disetujui' || v.status === 'Selesai' ? (
-                                      <CheckCircle className="w-2.5 h-2.5" />
-                                    ) : (
-                                      <Clock className="w-2.5 h-2.5 animate-pulse" />
-                                    )}
-                                    {v.status}
-                                  </span>
-
-                                  {isAdminActive && onUpdateVehicleStatus && (
-                                    <div className="flex items-center gap-1 mt-1">
-                                      {v.status !== 'Disetujui' && (
-                                        <button
-                                          type="button"
-                                          onClick={() => onUpdateVehicleStatus(v.id, 'Disetujui')}
-                                          className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 transition cursor-pointer"
-                                          title="Setujui Surat Jalan"
-                                        >
-                                          Setujui
-                                        </button>
-                                      )}
-                                      {v.status !== 'Selesai' && (
-                                        <button
-                                          type="button"
-                                          onClick={() => onUpdateVehicleStatus(v.id, 'Selesai')}
-                                          className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition cursor-pointer"
-                                          title="Tandai Selesai"
-                                        >
-                                          Selesai
-                                        </button>
-                                      )}
-                                      {v.status !== 'Ditolak' && (
-                                        <button
-                                          type="button"
-                                          onClick={() => onUpdateVehicleStatus(v.id, 'Ditolak')}
-                                          className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-500 transition cursor-pointer"
-                                          title="Tolak"
-                                        >
-                                          Tolak
-                                        </button>
-                                      )}
-                                      {onDeleteVehicle && (
-                                        <button
-                                          type="button"
-                                          onClick={() => onDeleteVehicle(v.id)}
-                                          className="p-1 rounded text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                                          title="Hapus"
-                                        >
-                                          <Trash2 className="w-3 h-3" />
-                                        </button>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-            )}
-
-              {/* MICRO-APP 3: SILOGIS (Inventory distribution log) */}
-              {activeMicroApp.id.includes('app_3') && (
-                <div className="space-y-6">
-                  {isAdminActive && onOpenServiceReportsModal && (
-                    <div className="p-4 bg-gradient-to-r from-amber-950 to-slate-900 text-white rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md border border-amber-800/40">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center font-black flex-shrink-0">
-                          <Box className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="font-bold text-xs sm:text-sm">Pusat Tindakan &amp; Rekap Logistik &amp; ATK (SILOGIS)</p>
-                          <p className="text-[11px] text-slate-300">Terdapat {logistics.length} permohonan logistik yang masuk — Tampilan &amp; tindakan seperti LAPOR-RT</p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveMicroApp(null);
-                          onOpenServiceReportsModal('silogis');
-                        }}
-                        className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-xs shadow transition cursor-pointer flex items-center gap-1.5 flex-shrink-0"
-                      >
-                        <span>Buka Rekap &amp; Tindakan</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                  
-                  {/* logistics form */}
-                  <form onSubmit={handleSilogisSubmit} className="lg:col-span-5 space-y-4">
-                    <h4 className="font-extrabold text-xs uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2">
-                      Permintaan ATK & Logistik
-                    </h4>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Nama Barang</label>
-                      <select
-                        value={silItem}
-                        onChange={(e) => setSilItem(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none bg-white font-semibold text-slate-800"
-                      >
-                        <option value="Kursi">Kursi</option>
-                        <option value="Meja">Meja</option>
-                        <option value="Mic">Mic</option>
-                        <option value="Sound">Sound</option>
-                        <option value="Tenda">Tenda</option>
-                        <option value="Karpet/Ambal">Karpet/Ambal</option>
-                        <option value="Snack Kotak">Snack Kotak</option>
-                        <option value="Nasi Kotak">Nasi Kotak</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Jumlah</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Contoh: 100 Unit"
-                        value={silQty}
-                        onChange={(e) => setSilQty(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Kegiatan</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Contoh: Sosialisasi APBD / Rapat Koordinasi"
-                        value={silDest}
-                        onChange={(e) => setSilDest(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Nama Pejabat / Staff Pemohon</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Contoh: Drs. Heri Supriyadi"
-                        value={silPemohon}
-                        onChange={(e) => setSilPemohon(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Dinas / Instansi</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Contoh: Bagian Organisasi Setda"
-                        value={silInstansi}
-                        onChange={(e) => setSilInstansi(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none"
-                      />
-                    </div>
-
-                    {renderFileUpload(silFile, setSilFile, silDragOver, setSilDragOver, 'border-amber-200 hover:border-amber-500 hover:bg-slate-50')}
-
-                    <button
-                      type="submit"
-                      disabled={isUploading}
-                      className="w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-extrabold shadow-md transition disabled:opacity-55 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-                    >
-                      {isUploading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                      <span>{isUploading ? 'Mengunggah Berkas...' : 'Kirim Permintaan Distribusi'}</span>
-                    </button>
-                  </form>
-
-                  {/* Stock delivery logs */}
-                  <div className="lg:col-span-7 space-y-4">
-                    <h4 className="font-extrabold text-xs uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2">
-                      Daftar Distribusi Logistik Setda
-                    </h4>
-
-                    <div className="overflow-hidden border border-slate-100 rounded-xl">
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="bg-slate-50 text-[10px] font-black text-slate-500 uppercase border-b border-slate-150">
-                            <th className="py-3 px-3">Nama Barang</th>
-                            <th className="py-3 px-3">Jumlah & Peruntukan</th>
-                            <th className="py-3 px-3 text-right">Status Distribusi</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {logistics.map((log) => (
-                            <tr key={log.id} className="text-xs text-slate-600 hover:bg-slate-50/50">
-                              <td className="py-3.5 px-3 font-extrabold text-slate-800">{log.barang}</td>
-                              <td className="py-3.5 px-3">
-                                <div className="font-bold">{log.jumlah}</div>
-                                {log.kegiatan && (
-                                  <div className="text-[10px] text-slate-500 font-semibold mt-0.5">Kegiatan: {log.kegiatan}</div>
-                                )}
-                                {(log.pemohon || log.instansi) && (
-                                  <div className="text-[10px] text-slate-400 font-semibold mt-0.5">Pemohon: {log.pemohon || '-'} ({log.instansi || '-'})</div>
-                                )}
-                                {log.documentUrl && (
-                                  <a 
-                                    href={log.documentUrl} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer" 
-                                    className="inline-flex items-center gap-1 mt-1 text-[10px] text-amber-655 hover:text-amber-800 font-extrabold bg-amber-50 hover:bg-amber-100 border border-amber-100 px-2 py-0.5 rounded-md transition duration-150 inline-flex"
-                                  >
-                                    <ExternalLink className="w-2.5 h-2.5 shrink-0" />
-                                    <span>Lihat Surat</span>
-                                  </a>
-                                )}
-                              </td>
-                              <td className="py-3.5 px-3 text-right">
-                                <div className="flex flex-col items-end gap-1.5">
-                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black ${
-                                    log.status === 'Selesai' 
-                                      ? 'bg-emerald-50 text-emerald-700' 
-                                      : log.status === 'Diproses'
-                                        ? 'bg-blue-50 text-blue-700'
-                                        : log.status === 'Ditolak'
-                                          ? 'bg-rose-50 text-rose-700'
-                                          : 'bg-amber-50 text-amber-700'
-                                  }`}>
-                                    {log.status === 'Selesai' ? (
-                                      <CheckCircle className="w-2.5 h-2.5" />
-                                    ) : (
-                                      <Clock className="w-2.5 h-2.5 animate-pulse" />
-                                    )}
-                                    {log.status}
-                                  </span>
-
-                                  {isAdminActive && onUpdateLogisticsStatus && (
-                                    <div className="flex items-center gap-1 mt-1">
-                                      {log.status !== 'Diproses' && (
-                                        <button
-                                          type="button"
-                                          onClick={() => onUpdateLogisticsStatus(log.id, 'Diproses')}
-                                          className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 transition cursor-pointer"
-                                          title="Proses Distribusi"
-                                        >
-                                          Proses
-                                        </button>
-                                      )}
-                                      {log.status !== 'Selesai' && (
-                                        <button
-                                          type="button"
-                                          onClick={() => onUpdateLogisticsStatus(log.id, 'Selesai')}
-                                          className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition cursor-pointer"
-                                          title="Tandai Selesai"
-                                        >
-                                          Selesai
-                                        </button>
-                                      )}
-                                      {log.status !== 'Ditolak' && (
-                                        <button
-                                          type="button"
-                                          onClick={() => onUpdateLogisticsStatus(log.id, 'Ditolak')}
-                                          className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-500 transition cursor-pointer"
-                                          title="Tolak"
-                                        >
-                                          Tolak
-                                        </button>
-                                      )}
-                                      {onDeleteLogistics && (
-                                        <button
-                                          type="button"
-                                          onClick={() => onDeleteLogistics(log.id)}
-                                          className="p-1 rounded text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                                          title="Hapus"
-                                        >
-                                          <Trash2 className="w-3 h-3" />
-                                        </button>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-            )}
-
-              {/* MICRO-APP 4: LAPOR-RT (Technical failure report) */}
-              {activeMicroApp.id.includes('app_4') && (
-                <div className="space-y-6">
-                  {isAdminActive && onOpenComplaintsModal && (
-                    <div className="p-4 bg-gradient-to-r from-rose-950 to-slate-900 text-white rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md border border-rose-800/40">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-rose-500/20 text-rose-300 flex items-center justify-center font-black flex-shrink-0">
-                          <MessageSquareText className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="font-bold text-xs sm:text-sm">Pusat Kotak Masuk Pengaduan (LAPOR-RT)</p>
-                          <p className="text-[11px] text-slate-300">Terdapat {complaints.length} total laporan warga &amp; pegawai yang tersimpan</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap flex-shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setActiveMicroApp(null);
-                            if (onOpenServiceReportsModal) {
-                              onOpenServiceReportsModal('lapor');
-                            } else if (onOpenComplaintsModal) {
-                              onOpenComplaintsModal();
-                            }
-                          }}
-                          className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs shadow transition cursor-pointer flex items-center gap-1.5"
-                        >
-                          <span>Buka Rekap &amp; Tindakan</span>
-                          <ChevronRight className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex gap-3 items-start text-rose-900">
-                    <AlertCircle className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-extrabold text-xs sm:text-sm">Pelaporan Kebersihan &amp; Kerusakan Fasilitas Kantor</p>
-                      <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
-                        Formulir aduan cepat ini terintegrasi langsung dengan staf pemeliharaan teknis gedung dan armada kebersihan Subbag Rumah Tangga Setda Tarakan.
-                      </p>
-                    </div>
-                  </div>
-
-                  <form onSubmit={handleLaporSubmit} className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">
-                          Dari Bagian
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="Contoh: Bagian Umum / Organisasi"
-                          value={lapBagian}
-                          onChange={(e) => setLapBagian(e.target.value)}
-                          className="w-full px-3.5 py-2.5 border rounded-xl text-xs focus:ring-1 focus:ring-teal-500 focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">
-                          Nama Pejabat / Staff
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="Contoh: Drs. Heri Supriyadi"
-                          value={lapPemohon}
-                          onChange={(e) => setLapPemohon(e.target.value)}
-                          className="w-full px-3.5 py-2.5 border rounded-xl text-xs focus:ring-1 focus:ring-teal-500 focus:outline-none"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">
-                          Lokasi Persis Gangguan / Ruangan (e.g. Lantai 1 Koridor Timur)
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="Contoh: Toilet Lantai 2 Sayap Barat"
-                          value={lapLoc}
-                          onChange={(e) => setLapLoc(e.target.value)}
-                          className="w-full px-3.5 py-2.5 border rounded-xl text-xs focus:ring-1 focus:ring-teal-500 focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">
-                          Rincian Masalah / Fasilitas Rusak (e.g. Lampu Pijar Padam / AC Panas)
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="Contoh: Pendingin AC bocor dan menetes"
-                          value={lapProblem}
-                          onChange={(e) => setLapProblem(e.target.value)}
-                          className="w-full px-3.5 py-2.5 border rounded-xl text-xs focus:ring-1 focus:ring-teal-500 focus:outline-none"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">
-                        Memo Tambahan Urgensi (Jika Ada)
-                      </label>
-                      <textarea
-                        rows={3}
-                        placeholder="Berikan detail tambahan tentang situasi kerusakan..."
-                        value={lapMemo}
-                        onChange={(e) => setLapMemo(e.target.value)}
-                        className="w-full px-3.5 py-2.5 border rounded-xl text-xs focus:ring-1 focus:ring-teal-500 focus:outline-none"
-                      />
-                    </div>
-
-                    <div className="flex justify-end gap-2 pt-2">
-                      <button
-                        type="button"
-                        onClick={() => setActiveMicroApp(null)}
-                        className="px-4 py-2 text-slate-550 hover:text-slate-800 text-xs font-bold"
-                      >
-                        Kembali
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-6 py-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs shadow-md transition"
-                      >
-                        Adukan Kendala Pemeliharaan
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              )}
-
-            </div>
-          </div>
-        </div>
-      )}
+      <ServicePortalModal
+        activeMicroApp={activeMicroApp}
+        onClose={() => setActiveMicroApp(null)}
+        isAdminActive={isAdminActive}
+        onOpenServiceReportsModal={onOpenServiceReportsModal}
+        onOpenComplaintsModal={onOpenComplaintsModal}
+        bookings={bookings}
+        onAddBooking={onAddBooking}
+        onUpdateBookingStatus={onUpdateBookingStatus}
+        onDeleteBooking={onDeleteBooking}
+        vehicles={vehicles}
+        onAddVehicle={onAddVehicle}
+        onUpdateVehicleStatus={onUpdateVehicleStatus}
+        onDeleteVehicle={onDeleteVehicle}
+        logistics={logistics}
+        onAddLogistics={onAddLogistics}
+        onUpdateLogisticsStatus={onUpdateLogisticsStatus}
+        onDeleteLogistics={onDeleteLogistics}
+        sajiRapat={sajiRapat}
+        onAddSajiRapat={onAddSajiRapat}
+        onUpdateSajiRapatStatus={onUpdateSajiRapatStatus}
+        onDeleteSajiRapat={onDeleteSajiRapat}
+        cinderamata={cinderamata}
+        onAddCinderamata={onAddCinderamata}
+        onUpdateCinderamataStatus={onUpdateCinderamataStatus}
+        onDeleteCinderamata={onDeleteCinderamata}
+        complaints={complaints}
+        onAddComplaint={onAddComplaint}
+        onUpdateComplaintStatus={onUpdateComplaintStatus}
+        onDeleteComplaint={onDeleteComplaint}
+        showToast={showToast}
+      />
 
     </section>
   );

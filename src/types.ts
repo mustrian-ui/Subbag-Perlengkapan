@@ -1,4 +1,4 @@
-export type AppCategory = 'internal' | 'logistics' | 'public';
+export type AppCategory = 'internal' | 'logistics' | 'public' | 'consumption' | 'souvenir';
 
 export interface Application {
   id: string;
@@ -27,6 +27,7 @@ export interface Booking {
   documentName?: string;
   pemohon?: string;
   instansi?: string;
+  kontak?: string;
   createdAt?: string;
 }
 
@@ -39,19 +40,72 @@ export interface Vehicle {
   documentUrl?: string;
   documentName?: string;
   instansi?: string;
+  kontak?: string;
   createdAt?: string;
 }
 
+// SajiRapat (Fasilitasi & Bantuan Konsumsi Rapat)
+export interface SajiRapatRequest {
+  id: string;
+  acara?: string;
+  tanggal?: string;
+  waktu?: string;
+  lokasi?: string;
+  pemohon?: string;
+  nip?: string;
+  kontak?: string;
+  instansi?: string;
+  porsi?: string | number; // e.g. "45 Porsi" or 45
+  jenisKonsumsi?: string; // e.g. "Snack Box & Makan Siang Prasmanan"
+  catatan?: string;
+  status: 'Menunggu Konfirmasi' | 'Menunggu' | 'Disetujui' | 'Diproses' | 'Selesai' | 'Ditolak' | string;
+  documentUrl?: string;
+  documentName?: string;
+  createdAt?: string;
+  barang?: string;
+  jumlah?: string | number;
+  kegiatan?: string;
+}
+
+// LogisticsRequest (Logistik Perlengkapan / SILOGIS)
 export interface LogisticsRequest {
   id: string;
   barang: string;
   jumlah: string;
-  status: 'Selesai' | 'Diproses' | 'Menunggu Konfirmasi' | 'Ditolak' | string;
+  status: 'Menunggu Konfirmasi' | 'Menunggu' | 'Diproses' | 'Disetujui' | 'Selesai' | 'Ditolak' | string;
   documentUrl?: string;
   documentName?: string;
   kegiatan?: string;
   pemohon?: string;
   instansi?: string;
+  kontak?: string;
+  nip?: string;
+  createdAt?: string;
+  acara?: string;
+  tanggal?: string;
+  waktu?: string;
+  lokasi?: string;
+  porsi?: string | number;
+  jenisKonsumsi?: string;
+  catatan?: string;
+}
+
+// PetaCendera (Permintaan & Pengelolaan Cinderamata)
+export interface CinderamataRequest {
+  id: string;
+  keperluan: string;
+  tanggalPerlu: string;
+  pemohon: string;
+  nip?: string;
+  kontak?: string;
+  instansi: string;
+  penerima?: string;
+  jenisCinderamata: string;
+  jumlah: string | number; // e.g. "3 Paket" or 3
+  catatan?: string;
+  status: 'Menunggu Konfirmasi' | 'Menunggu' | 'Disetujui' | 'Dipersiapkan' | 'Selesai' | 'Ditolak' | string;
+  documentUrl?: string;
+  documentName?: string;
   createdAt?: string;
 }
 

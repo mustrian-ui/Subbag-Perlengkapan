@@ -8,7 +8,7 @@ import GallerySection from './components/GallerySection';
 import ContactForm from './components/ContactForm';
 import AdminLoginModal from './components/AdminLoginModal';
 import Toast from './components/Toast';
-import { Application, GalleryItem, Booking, Vehicle, LogisticsRequest, ToastMessage, LandingPageContent, HallSchedule, Complaint } from './types';
+import { Application, GalleryItem, Booking, Vehicle, LogisticsRequest, SajiRapatRequest, CinderamataRequest, ToastMessage, LandingPageContent, HallSchedule, Complaint } from './types';
 import LandingEditModal from './components/LandingEditModal';
 import GoogleSheetsPanel from './components/GoogleSheetsPanel';
 import GedungSchedule from './components/GedungSchedule';
@@ -83,6 +83,12 @@ export default function App() {
   // Logistics requirements array
   const [logistics, setLogistics] = useState<LogisticsRequest[]>([]);
 
+  // SajiRapat requirements array (Konsumsi Rapat)
+  const [sajiRapat, setSajiRapat] = useState<SajiRapatRequest[]>([]);
+
+  // Cinderamata requirements array (PetaCendera)
+  const [cinderamata, setCinderamata] = useState<CinderamataRequest[]>([]);
+
   // Hall schedules dataset
   const [schedules, setSchedules] = useState<HallSchedule[]>([]);
 
@@ -143,44 +149,68 @@ export default function App() {
     });
 
     // 2. Applications sync
+    const DEFAULT_APPS: Application[] = [
+      {
+        id: 'app_1',
+        title: 'SIPERUM (Pinjam Ruang Rapat)',
+        category: 'internal',
+        icon: 'couch',
+        desc: 'Sistem Elektronik Reservasi Ruang Rapat pada Sekretariat Daerah Kota Tarakan. Lacak jadwal ruangan secara live.'
+      },
+      {
+        id: 'app_2',
+        title: 'SIPAKAR (Layanan Kendaraan Dinas)',
+        category: 'internal',
+        icon: 'car',
+        desc: 'Permohonan surat izin jalan, peminjaman kendaraan operasional dinas, serta pemantauan armada dinas Setda.'
+      },
+      {
+        id: 'app_3',
+        title: 'SILOGIS (Inventaris & ATK)',
+        category: 'logistics',
+        icon: 'box',
+        desc: 'Portal permintaan barang inventaris, alat tulis kantor (ATK), dan logistik rumah tangga secara digital & transparan.'
+      },
+      {
+        id: 'app_4',
+        title: 'LAPOR-RT (Layanan Pengaduan)',
+        category: 'public',
+        icon: 'alert',
+        desc: 'Platform pelaporan kerusakan prasarana, gangguan kebersihan, dan perbaikan fasilitas gedung kantor Setda.'
+      },
+      {
+        id: 'app_5',
+        title: 'SajiRapat (Konsumsi Rapat)',
+        category: 'consumption',
+        icon: 'utensils',
+        desc: 'Fasilitasi penyediaan snack dan konsumsi makan rapat dinas, sosialisasi, dan agenda resmi Sekretariat Daerah.'
+      },
+      {
+        id: 'app_6',
+        title: 'PetaCendera (Cinderamata & Plakat)',
+        category: 'souvenir',
+        icon: 'gift',
+        desc: 'Permohonan cinderamata resmi daerah, plakat khas Kota Tarakan, dan souvenir kehormatan tamu dinas.'
+      }
+    ];
+
     const appsRef = collection(db, 'applications');
     const unsubApps = onSnapshot(appsRef, (snap) => {
       if (!snap.empty) {
         const list: Application[] = [];
         snap.forEach(d => list.push(d.data() as Application));
+        // Auto-merge default apps if not yet present in firestore
+        DEFAULT_APPS.forEach(defApp => {
+          if (!list.some(a => a.id === defApp.id || a.title.toLowerCase().includes(defApp.title.toLowerCase().split(' ')[0]))) {
+            list.push(defApp);
+            if (auth.currentUser) {
+              setDoc(doc(db, 'applications', defApp.id), defApp).catch(() => {});
+            }
+          }
+        });
         list.sort((a, b) => a.id.localeCompare(b.id));
         setApplications(list);
       } else {
-        const DEFAULT_APPS: Application[] = [
-          {
-            id: 'app_1',
-            title: 'SIPERUM (Pinjam Ruang Rapat)',
-            category: 'internal',
-            icon: 'couch',
-            desc: 'Sistem Elektronik Reservasi Ruang Rapat pada Sekretariat Daerah Kota Tarakan. Lacak jadwal ruangan secara live.'
-          },
-          {
-            id: 'app_2',
-            title: 'SIPAKAR (Layanan Kendaraan Dinas)',
-            category: 'internal',
-            icon: 'car',
-            desc: 'Permohonan surat izin jalan, peminjaman kendaraan operasional dinas, serta pemantauan armada dinas Setda.'
-          },
-          {
-            id: 'app_3',
-            title: 'SILOGIS (Inventaris & ATK)',
-            category: 'logistics',
-            icon: 'box',
-            desc: 'Portal permintaan barang inventaris, alat tulis kantor (ATK), dan logistik rumah tangga secara digital & transparan.'
-          },
-          {
-            id: 'app_4',
-            title: 'LAPOR-RT (Layanan Pengaduan)',
-            category: 'public',
-            icon: 'alert',
-            desc: 'Platform pelaporan kerusakan prasarana, gangguan kebersihan, dan perbaikan fasilitas gedung kantor Setda.'
-          }
-        ];
         setApplications(DEFAULT_APPS);
         if (auth.currentUser) {
           DEFAULT_APPS.forEach(app => {
@@ -458,6 +488,108 @@ export default function App() {
       console.warn('Firestore complaints listen error:', err);
     });
 
+    // 9. SajiRapat (Konsumsi Rapat) sync
+    const sajiRef = collection(db, 'sajirapat');
+    const unsubSajiRapat = onSnapshot(sajiRef, (snap) => {
+      if (!snap.empty) {
+        const list: SajiRapatRequest[] = [];
+        snap.forEach(d => list.push(d.data() as SajiRapatRequest));
+        list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+        setSajiRapat(list);
+      } else {
+        const DEFAULT_SAJIRAPAT: SajiRapatRequest[] = [
+          {
+            id: 'saji_1',
+            acara: 'Rapat Koordinasi Pengendalian Inflasi Daerah Kota Tarakan',
+            tanggal: '2026-06-22',
+            waktu: '09:00 - 12:00 WITA',
+            lokasi: 'Ruang Rapat Imbaya Lt. 2',
+            jenisKonsumsi: 'Prasmanan & Snack',
+            porsi: 45,
+            pemohon: 'Drs. H. Hendra M., M.Si',
+            nip: '197508122001121004',
+            instansi: 'Bagian Perekonomian & SDA Setda',
+            kontak: '0812-5432-1100',
+            catatan: 'Disiapkan coffee break pagi dan makan siang prasmanan',
+            status: 'Disetujui',
+            createdAt: new Date().toISOString()
+          },
+          {
+            id: 'saji_2',
+            acara: 'Sosialisasi Reformasi Birokrasi dan Pelayanan Publik Setda',
+            tanggal: '2026-06-25',
+            waktu: '13:30 - 16:30 WITA',
+            lokasi: 'Ruang Rapat Datu Adil Lt. 1',
+            jenisKonsumsi: 'Snack Box Saja',
+            porsi: 60,
+            pemohon: 'Siti Aminah, S.STP',
+            nip: '198803152010012003',
+            instansi: 'Bagian Organisasi Setda',
+            kontak: '0852-4411-9876',
+            catatan: 'Kue basah tradisional khas Tarakan',
+            status: 'Menunggu',
+            createdAt: new Date().toISOString()
+          }
+        ];
+        setSajiRapat(DEFAULT_SAJIRAPAT);
+        if (auth.currentUser) {
+          DEFAULT_SAJIRAPAT.forEach(s => {
+            setDoc(doc(db, 'sajirapat', s.id), s).catch(() => {});
+          });
+        }
+      }
+    }, (err) => {
+      console.warn('Firestore sajiRapat listen error:', err);
+    });
+
+    // 10. Cinderamata (PetaCendera) sync
+    const cenderaRef = collection(db, 'cinderamata');
+    const unsubCinderamata = onSnapshot(cenderaRef, (snap) => {
+      if (!snap.empty) {
+        const list: CinderamataRequest[] = [];
+        snap.forEach(d => list.push(d.data() as CinderamataRequest));
+        list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+        setCinderamata(list);
+      } else {
+        const DEFAULT_CINDERAMATA: CinderamataRequest[] = [
+          {
+            id: 'cend_1',
+            jenisCinderamata: 'Plakat Kristal Kayu Khas Tarakan',
+            jumlah: 2,
+            keperluan: 'Kunjungan Kerja Tim Verifikasi Kemenpan-RB',
+            penerima: 'Deputi Bidang Pelayanan Publik Kemenpan-RB',
+            tanggalPerlu: '2026-06-24',
+            pemohon: 'Rian Pratama, S.IP',
+            nip: '199204102014021002',
+            instansi: 'Bagian Protokol & Komunikasi Pimpinan',
+            kontak: '0813-8877-2233',
+            status: 'Disetujui',
+            createdAt: new Date().toISOString()
+          },
+          {
+            id: 'cend_2',
+            jenisCinderamata: 'Kain Batik Khas Tarakan & Plakat Akrilik',
+            jumlah: 1,
+            keperluan: 'Pemberian Kenang-kenangan Tamu Studi Tiru Pemkab Berau',
+            penerima: 'Sekretaris Daerah Kabupaten Berau',
+            tanggalPerlu: '2026-06-28',
+            pemohon: 'M. Yusuf, SE',
+            instansi: 'Bagian Pemerintahan Setda',
+            status: 'Menunggu',
+            createdAt: new Date().toISOString()
+          }
+        ];
+        setCinderamata(DEFAULT_CINDERAMATA);
+        if (auth.currentUser) {
+          DEFAULT_CINDERAMATA.forEach(c => {
+            setDoc(doc(db, 'cinderamata', c.id), c).catch(() => {});
+          });
+        }
+      }
+    }, (err) => {
+      console.warn('Firestore cinderamata listen error:', err);
+    });
+
     return () => {
       unsubLanding();
       unsubApps();
@@ -467,6 +599,8 @@ export default function App() {
       unsubLogistics();
       unsubSchedules();
       unsubComplaints();
+      unsubSajiRapat();
+      unsubCinderamata();
     };
   }, []);
 
@@ -699,6 +833,68 @@ export default function App() {
     }
   };
 
+  const handleAddSajiRapat = async (newReq: SajiRapatRequest) => {
+    try {
+      await setDoc(doc(db, 'sajirapat', newReq.id), newReq);
+      setSajiRapat(prev => [newReq, ...prev.filter(s => s.id !== newReq.id)]);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `sajirapat/${newReq.id}`);
+    }
+  };
+
+  const handleUpdateSajiRapatStatus = async (id: string, status: string) => {
+    try {
+      await updateDoc(doc(db, 'sajirapat', id), { status });
+      setSajiRapat(prev => prev.map(s => s.id === id ? { ...s, status } : s));
+      triggerToast(`Status permohonan konsumsi diperbarui menjadi "${status}"`, 'success');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `sajirapat/${id}`);
+      throw err;
+    }
+  };
+
+  const handleDeleteSajiRapat = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'sajirapat', id));
+      setSajiRapat(prev => prev.filter(s => s.id !== id));
+      triggerToast('Data permohonan konsumsi berhasil dihapus', 'info');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `sajirapat/${id}`);
+      throw err;
+    }
+  };
+
+  const handleAddCinderamata = async (newReq: CinderamataRequest) => {
+    try {
+      await setDoc(doc(db, 'cinderamata', newReq.id), newReq);
+      setCinderamata(prev => [newReq, ...prev.filter(c => c.id !== newReq.id)]);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `cinderamata/${newReq.id}`);
+    }
+  };
+
+  const handleUpdateCinderamataStatus = async (id: string, status: string) => {
+    try {
+      await updateDoc(doc(db, 'cinderamata', id), { status });
+      setCinderamata(prev => prev.map(c => c.id === id ? { ...c, status } : c));
+      triggerToast(`Status permohonan cinderamata diperbarui menjadi "${status}"`, 'success');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `cinderamata/${id}`);
+      throw err;
+    }
+  };
+
+  const handleDeleteCinderamata = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'cinderamata', id));
+      setCinderamata(prev => prev.filter(c => c.id !== id));
+      triggerToast('Data permohonan cinderamata berhasil dihapus', 'info');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `cinderamata/${id}`);
+      throw err;
+    }
+  };
+
   const handleScrollToSection = (sectionId: string) => {
     const elem = document.getElementById(sectionId);
     if (elem) {
@@ -822,6 +1018,16 @@ export default function App() {
           onAddLogistics={handleAddLogistics}
           onUpdateLogisticsStatus={handleUpdateLogisticsStatus}
           onDeleteLogistics={handleDeleteLogistics}
+
+          sajiRapat={sajiRapat}
+          onAddSajiRapat={handleAddSajiRapat}
+          onUpdateSajiRapatStatus={handleUpdateSajiRapatStatus}
+          onDeleteSajiRapat={handleDeleteSajiRapat}
+
+          cinderamata={cinderamata}
+          onAddCinderamata={handleAddCinderamata}
+          onUpdateCinderamataStatus={handleUpdateCinderamataStatus}
+          onDeleteCinderamata={handleDeleteCinderamata}
 
           complaints={complaints}
           onOpenComplaintsModal={() => setIsComplaintsModalOpen(true)}
@@ -958,6 +1164,8 @@ export default function App() {
         bookings={bookings}
         vehicles={vehicles}
         logistics={logistics}
+        sajiRapat={sajiRapat}
+        cinderamata={cinderamata}
         complaints={complaints}
         onUpdateBookingStatus={handleUpdateBookingStatus}
         onDeleteBooking={handleDeleteBooking}
@@ -965,6 +1173,8 @@ export default function App() {
         onDeleteVehicle={handleDeleteVehicle}
         onUpdateLogisticsStatus={handleUpdateLogisticsStatus}
         onDeleteLogistics={handleDeleteLogistics}
+        onUpdateCinderamataStatus={handleUpdateCinderamataStatus}
+        onDeleteCinderamata={handleDeleteCinderamata}
         onUpdateComplaintStatus={handleUpdateComplaintStatus}
         onDeleteComplaint={handleDeleteComplaint}
         showToast={triggerToast}

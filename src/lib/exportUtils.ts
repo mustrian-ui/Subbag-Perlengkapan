@@ -1,4 +1,4 @@
-import { Booking, Vehicle, LogisticsRequest, Complaint } from '../types';
+import { Booking, Vehicle, LogisticsRequest, SajiRapatRequest, CinderamataRequest, Complaint } from '../types';
 
 /**
  * Trigger browser file download from string content with UTF-8 BOM
@@ -81,23 +81,60 @@ export function exportVehiclesCsv(vehicles: Vehicle[]) {
 }
 
 /**
- * Export SILOGIS Logistics to CSV
+ * Export SILOGIS / SajiRapat Logistics to CSV
  */
-export function exportLogisticsCsv(logistics: LogisticsRequest[]) {
-  const headers = ['No', 'ID Permintaan', 'Nama Barang / ATK', 'Jumlah / Volume', 'Instansi / Bagian Pemohon', 'Nama Pemohon', 'Peruntukan / Kegiatan', 'Status Pemenuhan'];
-  const rows = logistics.map((l, idx) => [
+export function exportLogisticsCsv(logistics: (LogisticsRequest | SajiRapatRequest)[]) {
+  exportSajiRapatCsv(logistics as SajiRapatRequest[]);
+}
+
+/**
+ * Export SajiRapat (Fasilitasi Konsumsi Rapat) to CSV
+ */
+export function exportSajiRapatCsv(requests: SajiRapatRequest[]) {
+  const headers = ['No', 'ID Permohonan', 'Acara Rapat / Kegiatan', 'Tanggal Rapat', 'Waktu Pelaksanaan', 'Lokasi / Ruang', 'Jumlah Porsi', 'Jenis Konsumsi', 'Nama Pemohon', 'Instansi / Bagian', 'Kontak WhatsApp', 'Catatan / Menu', 'Status'];
+  const rows = requests.map((r, idx) => [
     idx + 1,
-    escapeCsv(l.id),
-    escapeCsv(l.barang),
-    escapeCsv(l.jumlah),
-    escapeCsv(l.instansi || '-'),
-    escapeCsv(l.pemohon || '-'),
-    escapeCsv(l.kegiatan || '-'),
-    escapeCsv(l.status)
+    escapeCsv(r.id),
+    escapeCsv(r.acara || r.barang || '-'),
+    escapeCsv(r.tanggal || '-'),
+    escapeCsv(r.waktu || '-'),
+    escapeCsv(r.lokasi || '-'),
+    escapeCsv(r.porsi || r.jumlah || '-'),
+    escapeCsv(r.jenisKonsumsi || r.barang || '-'),
+    escapeCsv(r.pemohon || '-'),
+    escapeCsv(r.instansi || '-'),
+    escapeCsv(r.kontak || '-'),
+    escapeCsv(r.catatan || r.kegiatan || '-'),
+    escapeCsv(r.status)
   ]);
 
-  const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
-  const filename = `SILOGIS_Rekap_Logistik_ATK_${new Date().toISOString().slice(0, 10)}.csv`;
+  const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\r\n');
+  const filename = `SajiRapat_Rekap_Konsumsi_${new Date().toISOString().slice(0, 10)}.csv`;
+  downloadFile(filename, csvContent);
+}
+
+/**
+ * Export PetaCendera (Permintaan & Pengelolaan Cinderamata) to CSV
+ */
+export function exportCinderamataCsv(requests: CinderamataRequest[]) {
+  const headers = ['No', 'ID Permohonan', 'Keperluan / Acara', 'Tanggal Diperlukan', 'Penerima / Tamu Kehormatan', 'Jenis Cinderamata', 'Jumlah Unit / Paket', 'Nama Pemohon', 'Instansi / Bagian', 'Kontak', 'Catatan Penyerahan', 'Status'];
+  const rows = requests.map((c, idx) => [
+    idx + 1,
+    escapeCsv(c.id),
+    escapeCsv(c.keperluan),
+    escapeCsv(c.tanggalPerlu),
+    escapeCsv(c.penerima),
+    escapeCsv(c.jenisCinderamata),
+    escapeCsv(c.jumlah),
+    escapeCsv(c.pemohon),
+    escapeCsv(c.instansi),
+    escapeCsv(c.kontak || '-'),
+    escapeCsv(c.catatan || '-'),
+    escapeCsv(c.status)
+  ]);
+
+  const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\r\n');
+  const filename = `PetaCendera_Rekap_Cinderamata_${new Date().toISOString().slice(0, 10)}.csv`;
   downloadFile(filename, csvContent);
 }
 
