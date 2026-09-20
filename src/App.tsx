@@ -713,6 +713,7 @@ export default function App() {
               bookings={bookings}
               vehicles={vehicles}
               logistics={logistics}
+              complaints={complaints}
               onShowToast={triggerToast}
             />
           </div>
