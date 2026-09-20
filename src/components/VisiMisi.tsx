@@ -71,7 +71,7 @@ export default function VisiMisi({ isAdminActive, content, onEditTrigger }: Visi
             </div>
 
             <div className="pt-10 border-t border-white/10 mt-10 relative z-10 flex items-center justify-between text-xs text-slate-400">
-              <span className="font-medium tracking-wide">Sinergitas Menuju Tarakan Smart City</span>
+              <span className="font-medium tracking-wide">Sinergitas Menuju Tarakan HIBOT</span>
               <Award className="w-4 h-4 text-amber-500" />
             </div>
             

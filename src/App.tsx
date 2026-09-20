@@ -116,20 +116,24 @@ export default function App() {
           data.heroBgUrl.includes('/assets/images/')
         ) {
           const updatedContent = { ...data, heroBgUrl: pnsHeroBackground };
-          setDoc(landingRef, updatedContent).catch(err => {
-            console.error('Failed to update landing hero background to PNS default:', err);
-          });
+          if (auth.currentUser) {
+            setDoc(landingRef, updatedContent).catch(err => {
+              console.warn('Failed to update landing hero background to PNS default:', err);
+            });
+          }
           setLandingContent(updatedContent);
         } else {
           setLandingContent(data);
         }
       } else {
-        setDoc(landingRef, DEFAULT_LANDING_CONTENT).catch(err => {
-          console.error('Failed to seed landing content:', err);
-        });
+        if (auth.currentUser) {
+          setDoc(landingRef, DEFAULT_LANDING_CONTENT).catch(err => {
+            console.warn('Failed to seed landing content:', err);
+          });
+        }
       }
     }, (err) => {
-      console.error('Firestore landing content listen error:', err);
+      console.warn('Firestore landing content listen error:', err);
     });
 
     // 2. Applications sync
@@ -171,14 +175,17 @@ export default function App() {
             desc: 'Platform pelaporan kerusakan prasarana, gangguan kebersihan, dan perbaikan fasilitas gedung kantor Setda.'
           }
         ];
-        DEFAULT_APPS.forEach(app => {
-          setDoc(doc(db, 'applications', app.id), app).catch(err => {
-            console.error('Failed to seed application:', app.id, err);
+        setApplications(DEFAULT_APPS);
+        if (auth.currentUser) {
+          DEFAULT_APPS.forEach(app => {
+            setDoc(doc(db, 'applications', app.id), app).catch(err => {
+              console.warn('Failed to seed application:', app.id, err);
+            });
           });
-        });
+        }
       }
     }, (err) => {
-      console.error('Firestore applications listen error:', err);
+      console.warn('Firestore applications listen error:', err);
     });
 
     // 3. Gallery sync
@@ -220,14 +227,17 @@ export default function App() {
             url: 'https://images.unsplash.com/photo-1431540015161-0bf868a2d407?auto=format&fit=crop&q=80&w=800'
           }
         ];
-        DEFAULT_GALLERY.forEach(item => {
-          setDoc(doc(db, 'gallery', item.id), item).catch(err => {
-            console.error('Failed to seed gallery:', item.id, err);
+        setGalleryItems(DEFAULT_GALLERY);
+        if (auth.currentUser) {
+          DEFAULT_GALLERY.forEach(item => {
+            setDoc(doc(db, 'gallery', item.id), item).catch(err => {
+              console.warn('Failed to seed gallery:', item.id, err);
+            });
           });
-        });
+        }
       }
     }, (err) => {
-      console.error('Firestore gallery listen error:', err);
+      console.warn('Firestore gallery listen error:', err);
     });
 
     // 4. Bookings sync
@@ -261,14 +271,17 @@ export default function App() {
             instansi: 'Subbag Protokol Setda'
           }
         ];
-        DEFAULT_BOOKINGS.forEach(b => {
-          setDoc(doc(db, 'bookings', b.id), b).catch(err => {
-            console.error('Failed to seed booking:', b.id, err);
+        setBookings(DEFAULT_BOOKINGS);
+        if (auth.currentUser) {
+          DEFAULT_BOOKINGS.forEach(b => {
+            setDoc(doc(db, 'bookings', b.id), b).catch(err => {
+              console.warn('Failed to seed booking:', b.id, err);
+            });
           });
-        });
+        }
       }
     }, (err) => {
-      console.error('Firestore bookings listen error:', err);
+      console.warn('Firestore bookings listen error:', err);
     });
 
     // 5. Vehicles sync
@@ -290,14 +303,17 @@ export default function App() {
             status: 'Disetujui' 
           }
         ];
-        DEFAULT_VEHICLES.forEach(v => {
-          setDoc(doc(db, 'vehicles', v.id), v).catch(err => {
-            console.error('Failed to seed vehicle:', v.id, err);
+        setVehicles(DEFAULT_VEHICLES);
+        if (auth.currentUser) {
+          DEFAULT_VEHICLES.forEach(v => {
+            setDoc(doc(db, 'vehicles', v.id), v).catch(err => {
+              console.warn('Failed to seed vehicle:', v.id, err);
+            });
           });
-        });
+        }
       }
     }, (err) => {
-      console.error('Firestore vehicles listen error:', err);
+      console.warn('Firestore vehicles listen error:', err);
     });
 
     // 6. Logistics sync
@@ -329,14 +345,17 @@ export default function App() {
             instansi: 'Bagian Kesejahteraan Rakyat Setda'
           }
         ];
-        DEFAULT_LOGISTICS.forEach(l => {
-          setDoc(doc(db, 'logistics', l.id), l).catch(err => {
-            console.error('Failed to seed logistics:', l.id, err);
+        setLogistics(DEFAULT_LOGISTICS);
+        if (auth.currentUser) {
+          DEFAULT_LOGISTICS.forEach(l => {
+            setDoc(doc(db, 'logistics', l.id), l).catch(err => {
+              console.warn('Failed to seed logistics:', l.id, err);
+            });
           });
-        });
+        }
       }
     }, (err) => {
-      console.error('Firestore logistics listen error:', err);
+      console.warn('Firestore logistics listen error:', err);
     });
 
     // 7. Schedules sync
@@ -378,14 +397,17 @@ export default function App() {
             keterangan: 'Tunda / Reschedule'
           }
         ];
-        DEFAULT_SCHEDULES.forEach(s => {
-          setDoc(doc(db, 'schedules', s.id), s).catch(err => {
-            console.error('Failed to seed schedule:', s.id, err);
+        setSchedules(DEFAULT_SCHEDULES);
+        if (auth.currentUser) {
+          DEFAULT_SCHEDULES.forEach(s => {
+            setDoc(doc(db, 'schedules', s.id), s).catch(err => {
+              console.warn('Failed to seed schedule:', s.id, err);
+            });
           });
-        });
+        }
       }
     }, (err) => {
-      console.error('Firestore schedules listen error:', err);
+      console.warn('Firestore schedules listen error:', err);
     });
 
     return () => {

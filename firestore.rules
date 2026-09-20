@@ -11,6 +11,11 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Connectivity test collection
+    match /test/{testId} {
+      allow read: if true;
+    }
+
     // Settings collection for landing page customization
     match /settings/{settingId} {
       allow read: if true;
