@@ -6,11 +6,6 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Catch-all rule for general safety
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
     // Connectivity test collection
     match /test/{testId} {
       allow read: if true;
@@ -18,44 +13,47 @@ service cloud.firestore {
 
     // Settings collection for landing page customization
     match /settings/{settingId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // Applications list
     match /applications/{appId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // Gallery item list
     match /gallery/{galleryId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
-    // Bookings (SIPERUM) list - Public can submit, only admin can modify/delete
+    // Bookings (SIPERUM) list
     match /bookings/{bookingId} {
-      allow read, create: if true;
-      allow update, delete: if isAuthenticated();
+      allow read, write: if true;
     }
 
-    // Vehicles (SIPAKAR) list - Public can submit, only admin can modify/delete
+    // Vehicles (SIPAKAR) list
     match /vehicles/{vehicleId} {
-      allow read, create: if true;
-      allow update, delete: if isAuthenticated();
+      allow read, write: if true;
     }
 
-    // Logistics (SILOGIS) list - Public can submit, only admin can modify/delete
+    // Logistics (SILOGIS) list
     match /logistics/{logisticsId} {
-      allow read, create: if true;
-      allow update, delete: if isAuthenticated();
+      allow read, write: if true;
     }
 
-    // Schedules (Jadwal Gedung) list
+    // Schedules (Jadwal Gedung GSG) list
     match /schedules/{scheduleId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
+    }
+
+    // Complaints (LAPOR-RT / Pengaduan Masyarakat & Pegawai)
+    match /complaints/{complaintId} {
+      allow read, write: if true;
+    }
+
+    // Catch-all rule for general safety
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

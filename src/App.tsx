@@ -8,12 +8,13 @@ import GallerySection from './components/GallerySection';
 import ContactForm from './components/ContactForm';
 import AdminLoginModal from './components/AdminLoginModal';
 import Toast from './components/Toast';
-import { Application, GalleryItem, Booking, Vehicle, LogisticsRequest, ToastMessage, LandingPageContent, HallSchedule } from './types';
+import { Application, GalleryItem, Booking, Vehicle, LogisticsRequest, ToastMessage, LandingPageContent, HallSchedule, Complaint } from './types';
 import LandingEditModal from './components/LandingEditModal';
 import GoogleSheetsPanel from './components/GoogleSheetsPanel';
 import GedungSchedule from './components/GedungSchedule';
+import ComplaintsModal from './components/ComplaintsModal';
 import { getAccessToken, appendBookingToSheet, appendVehicleToSheet, appendLogisticsToSheet } from './lib/googleSheets';
-import { collection, onSnapshot, setDoc, doc, deleteDoc } from 'firebase/firestore';
+import { collection, onSnapshot, setDoc, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from './lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 const pnsHeroBackground = 'https://i.ibb.co.com/k2pcNHtX/back-Asn.png';
@@ -84,6 +85,10 @@ export default function App() {
   // Hall schedules dataset
   const [schedules, setSchedules] = useState<HallSchedule[]>([]);
 
+  // Complaints dataset state (LAPOR-RT)
+  const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [isComplaintsModalOpen, setIsComplaintsModalOpen] = useState<boolean>(false);
+
   // Firebase Auth state listener
   useEffect(() => {
     const isBypassActive = localStorage.getItem('admin_bypass_active') === 'true';
@@ -116,21 +121,17 @@ export default function App() {
           data.heroBgUrl.includes('/assets/images/')
         ) {
           const updatedContent = { ...data, heroBgUrl: pnsHeroBackground };
-          if (auth.currentUser) {
-            setDoc(landingRef, updatedContent).catch(err => {
-              console.warn('Failed to update landing hero background to PNS default:', err);
-            });
-          }
+          setDoc(landingRef, updatedContent).catch(err => {
+            console.warn('Failed to update landing hero background to PNS default:', err);
+          });
           setLandingContent(updatedContent);
         } else {
           setLandingContent(data);
         }
       } else {
-        if (auth.currentUser) {
-          setDoc(landingRef, DEFAULT_LANDING_CONTENT).catch(err => {
-            console.warn('Failed to seed landing content:', err);
-          });
-        }
+        setDoc(landingRef, DEFAULT_LANDING_CONTENT).catch(err => {
+          console.warn('Failed to seed landing content:', err);
+        });
       }
     }, (err) => {
       console.warn('Firestore landing content listen error:', err);
@@ -398,16 +399,58 @@ export default function App() {
           }
         ];
         setSchedules(DEFAULT_SCHEDULES);
-        if (auth.currentUser) {
-          DEFAULT_SCHEDULES.forEach(s => {
-            setDoc(doc(db, 'schedules', s.id), s).catch(err => {
-              console.warn('Failed to seed schedule:', s.id, err);
-            });
+        DEFAULT_SCHEDULES.forEach(s => {
+          setDoc(doc(db, 'schedules', s.id), s).catch(err => {
+            console.warn('Failed to seed schedule:', s.id, err);
           });
-        }
+        });
       }
     }, (err) => {
       console.warn('Firestore schedules listen error:', err);
+    });
+
+    // 8. Complaints (LAPOR-RT) sync
+    const complaintsRef = collection(db, 'complaints');
+    const unsubComplaints = onSnapshot(complaintsRef, (snap) => {
+      if (!snap.empty) {
+        const list: Complaint[] = [];
+        snap.forEach(d => list.push(d.data() as Complaint));
+        list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        setComplaints(list);
+      } else {
+        const DEFAULT_COMPLAINTS: Complaint[] = [
+          {
+            id: 'comp_demo_1',
+            name: 'Budi Santoso, S.STP',
+            nip: '19850314 200801 1 003',
+            bagian: 'Bagian Organisasi & Tata Laksana',
+            type: 'Kerusakan Fasilitas',
+            location: 'Lantai 2 Koridor Timur Ruang Arsip',
+            message: 'Unit AC ruangan mengalami kebocoran pipa kondensasi dan pendingin tidak bekerja optimal sejak kemarin sore.',
+            status: 'Diproses',
+            createdAt: new Date(Date.now() - 3600000 * 24).toISOString()
+          },
+          {
+            id: 'comp_demo_2',
+            name: 'Siti Rahmawati, A.Md',
+            nip: '19920821 201503 2 005',
+            bagian: 'Subbag Protokol & Komunikasi Pimpinan',
+            type: 'Pelayanan Kebersihan',
+            location: 'Toilet Pegawai Sayap Barat Gedung Utama',
+            message: 'Kran wastafel tersumbat dan persediaan sabun cuci tangan habis pasca kegiatan rapat koordinasi forkopimda.',
+            status: 'Masuk',
+            createdAt: new Date(Date.now() - 3600000 * 2).toISOString()
+          }
+        ];
+        setComplaints(DEFAULT_COMPLAINTS);
+        DEFAULT_COMPLAINTS.forEach(c => {
+          setDoc(doc(db, 'complaints', c.id), c).catch(err => {
+            console.warn('Failed to seed complaint:', c.id, err);
+          });
+        });
+      }
+    }, (err) => {
+      console.warn('Firestore complaints listen error:', err);
     });
 
     return () => {
@@ -418,8 +461,33 @@ export default function App() {
       unsubVehicles();
       unsubLogistics();
       unsubSchedules();
+      unsubComplaints();
     };
   }, []);
+
+  const handleUpdateComplaintStatus = async (id: string, status: 'Masuk' | 'Diproses' | 'Selesai') => {
+    try {
+      await updateDoc(doc(db, 'complaints', id), { status });
+      setComplaints(prev => prev.map(c => c.id === id ? { ...c, status } : c));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `complaints/${id}`);
+      throw err;
+    }
+  };
+
+  const handleDeleteComplaint = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'complaints', id));
+      setComplaints(prev => prev.filter(c => c.id !== id));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `complaints/${id}`);
+      throw err;
+    }
+  };
+
+  const handleAddComplaint = (newComp: Complaint) => {
+    setComplaints(prev => [newComp, ...prev.filter(c => c.id !== newComp.id)]);
+  };
 
   const handleAddSchedule = async (newSched: HallSchedule) => {
     try {
@@ -582,6 +650,9 @@ export default function App() {
       {/* 1. ADMIN PANEL TOP BANNER INDICATOR */}
       <AdminBar 
         isActive={isAdminActive} 
+        complaintsCount={complaints.length}
+        newComplaintsCount={complaints.filter(c => c.status === 'Masuk').length}
+        onOpenComplaints={() => setIsComplaintsModalOpen(true)}
         onLogout={async () => {
           try {
             localStorage.removeItem('admin_bypass_active');
@@ -663,6 +734,10 @@ export default function App() {
           
           logistics={logistics}
           onAddLogistics={handleAddLogistics}
+
+          complaints={complaints}
+          onOpenComplaintsModal={() => setIsComplaintsModalOpen(true)}
+          onAddComplaint={handleAddComplaint}
           
           showToast={triggerToast}
         />
@@ -687,7 +762,10 @@ export default function App() {
         />
 
         {/* Direct In-App Government Feedback Forms Section */}
-        <ContactForm showToast={triggerToast} />
+        <ContactForm 
+          showToast={triggerToast} 
+          onAddComplaint={handleAddComplaint}
+        />
 
       </main>
 
@@ -758,11 +836,22 @@ export default function App() {
         onSave={async (newContent) => {
           try {
             await setDoc(doc(db, 'settings', 'landing'), newContent);
+            setLandingContent(newContent);
             triggerToast('Susunan konten halaman utama berhasil diperbarui!', 'success');
           } catch (err) {
             handleFirestoreError(err, OperationType.WRITE, 'settings/landing');
           }
         }}
+      />
+
+      {/* 4.6. COMPLAINTS & LAPOR-RT MANAGEMENT MODAL */}
+      <ComplaintsModal
+        isOpen={isComplaintsModalOpen}
+        onClose={() => setIsComplaintsModalOpen(false)}
+        complaints={complaints}
+        onUpdateStatus={handleUpdateComplaintStatus}
+        onDeleteComplaint={handleDeleteComplaint}
+        showToast={triggerToast}
       />
 
       {/* 5. PORTAL AUTH MODAL */}

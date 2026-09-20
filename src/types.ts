@@ -86,3 +86,15 @@ export interface HallSchedule {
   keterangan: string; // Keterangan
 }
 
+export interface Complaint {
+  id: string;
+  name: string;
+  nip?: string;
+  bagian: string;
+  type: string;
+  location?: string;
+  message: string;
+  status: 'Masuk' | 'Diproses' | 'Selesai';
+  createdAt: string;
+}
+

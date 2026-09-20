@@ -109,6 +109,23 @@
         "keterangan": { "type": "string" }
       },
       "required": ["id", "hariTanggal", "kegiatan", "instansi", "keterangan"]
+    },
+    "Complaint": {
+      "title": "Complaint",
+      "description": "Laporan pengaduan sarana dan prasarana (LAPOR-RT)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "nip": { "type": "string" },
+        "bagian": { "type": "string" },
+        "type": { "type": "string" },
+        "location": { "type": "string" },
+        "message": { "type": "string" },
+        "status": { "type": "string", "enum": ["Masuk", "Diproses", "Selesai"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "bagian", "type", "message", "status", "createdAt"]
     }
   },
   "firestore": {
@@ -139,6 +156,10 @@
     "schedules/{scheduleId}": {
       "schema": "HallSchedule",
       "description": "Shared hall/building schedules"
+    },
+    "complaints/{complaintId}": {
+      "schema": "Complaint",
+      "description": "Incoming user reports and complaints (LAPOR-RT)"
     }
   }
 }

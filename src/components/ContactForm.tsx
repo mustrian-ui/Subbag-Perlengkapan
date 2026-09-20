@@ -1,36 +1,63 @@
 import React, { useState } from 'react';
-import { Mail, PhoneCall, MapPin, Send, HelpCircle } from 'lucide-react';
+import { Mail, PhoneCall, MapPin, Send, HelpCircle, Loader2 } from 'lucide-react';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { Complaint } from '../types';
 
 interface ContactFormProps {
   showToast: (msg: string, type: 'success' | 'error' | 'info') => void;
+  onAddComplaint?: (complaint: Complaint) => void;
 }
 
-export default function ContactForm({ showToast }: ContactFormProps) {
+export default function ContactForm({ showToast, onAddComplaint }: ContactFormProps) {
   const [name, setName] = useState('');
   const [nip, setNip] = useState('');
   const [bagian, setBagian] = useState('');
   const [type, setType] = useState('Kerusakan Fasilitas');
   const [message, setMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !nip.trim() || !bagian.trim() || !message.trim()) {
       showToast('Harap isi semua kolom pengaduan!', 'error');
       return;
     }
 
-    // Trigger feedback notification
-    showToast(
-      `Laporan dari ${name} (${bagian}) terkait [${type}] berhasil masuk ke pusat pengaduan Subbag!`, 
-      'success'
-    );
+    setIsSubmitting(true);
+    const complaintId = `comp_${Date.now()}`;
+    const newComplaint: Complaint = {
+      id: complaintId,
+      name: name.trim(),
+      nip: nip.trim(),
+      bagian: bagian.trim(),
+      type,
+      message: message.trim(),
+      status: 'Masuk',
+      createdAt: new Date().toISOString()
+    };
 
-    // reset fields
-    setName('');
-    setNip('');
-    setBagian('');
-    setType('Kerusakan Fasilitas');
-    setMessage('');
+    try {
+      await setDoc(doc(db, 'complaints', complaintId), newComplaint);
+      if (onAddComplaint) {
+        onAddComplaint(newComplaint);
+      }
+      showToast(
+        `Laporan dari ${name} (${bagian}) terkait [${type}] berhasil masuk dan tersimpan ke pusat pengaduan Subbag!`, 
+        'success'
+      );
+      // reset fields
+      setName('');
+      setNip('');
+      setBagian('');
+      setType('Kerusakan Fasilitas');
+      setMessage('');
+    } catch (err) {
+      console.error('Failed to submit complaint to Firestore:', err);
+      showToast('Gagal mengirim pengaduan ke server. Silakan coba kembali.', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -184,9 +211,17 @@ export default function ContactForm({ showToast }: ContactFormProps) {
                 <div className="pt-2">
                   <button
                     type="submit"
-                    className="w-full sm:w-auto px-7 py-3 rounded-xl bg-teal-600 hover:bg-teal-550 text-white font-extrabold text-sm shadow-lg shadow-teal-900/30 hover:translate-y-[-1px] active:translate-y-0 transition-all duration-200 cursor-pointer flex items-center justify-center gap-2"
+                    disabled={isSubmitting}
+                    className="w-full sm:w-auto px-7 py-3 rounded-xl bg-teal-600 hover:bg-teal-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-extrabold text-sm shadow-lg shadow-teal-900/30 hover:translate-y-[-1px] active:translate-y-0 transition-all duration-200 cursor-pointer flex items-center justify-center gap-2"
                   >
-                    <span>Ajukan Laporan Pengaduan</span>
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Menyimpan Laporan...</span>
+                      </>
+                    ) : (
+                      <span>Ajukan Laporan Pengaduan</span>
+                    )}
                   </button>
                 </div>
 

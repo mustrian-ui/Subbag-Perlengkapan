@@ -17,15 +17,19 @@ import {
   Upload,
   Paperclip,
   Loader2,
-  ExternalLink
+  ExternalLink,
+  MessageSquareText
 } from 'lucide-react';
 import { 
   Application, 
   AppCategory, 
   Booking, 
   Vehicle, 
-  LogisticsRequest 
+  LogisticsRequest,
+  Complaint
 } from '../types';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { 
   getAccessToken, 
   getOrCreateDriveFolder, 
@@ -47,6 +51,10 @@ interface AppGridProps {
   
   logistics: LogisticsRequest[];
   onAddLogistics: (req: LogisticsRequest) => void;
+
+  complaints?: Complaint[];
+  onOpenComplaintsModal?: () => void;
+  onAddComplaint?: (complaint: Complaint) => void;
   
   showToast: (msg: string, type: 'success' | 'error' | 'info') => void;
 }
@@ -84,6 +92,10 @@ export default function AppGrid({
   
   logistics,
   onAddLogistics,
+
+  complaints = [],
+  onOpenComplaintsModal,
+  onAddComplaint,
   
   showToast
 }: AppGridProps) {
@@ -452,14 +464,35 @@ export default function AppGrid({
     setActiveMicroApp(null);
   };
 
-  const handleLaporSubmit = (e: FormEvent) => {
+  const handleLaporSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!lapLoc || !lapProblem || !lapBagian || !lapPemohon) {
       showToast('Harap lengkapi semua isian kosong!', 'error');
       return;
     }
 
-    showToast('Laporan kerusakan terkirim! Tim operasional RT akan segera meninjau lokasi.', 'success');
+    const complaintId = `comp_${Date.now()}`;
+    const newComplaint: Complaint = {
+      id: complaintId,
+      name: lapPemohon.trim(),
+      bagian: lapBagian.trim(),
+      location: lapLoc.trim(),
+      type: 'Kerusakan Fasilitas',
+      message: `${lapProblem.trim()}${lapMemo ? ` (Catatan: ${lapMemo.trim()})` : ''}`,
+      status: 'Masuk',
+      createdAt: new Date().toISOString()
+    };
+
+    try {
+      await setDoc(doc(db, 'complaints', complaintId), newComplaint);
+      if (onAddComplaint) {
+        onAddComplaint(newComplaint);
+      }
+      showToast('Laporan kerusakan terkirim dan tersimpan di database Subbag RT!', 'success');
+    } catch (err) {
+      console.error('Failed to submit lapor:', err);
+      showToast('Gagal menyimpan laporan ke server.', 'error');
+    }
     
     // reset
     setLapLoc('');
@@ -1213,6 +1246,31 @@ export default function AppGrid({
               {/* MICRO-APP 4: LAPOR-RT (Technical failure report) */}
               {activeMicroApp.id.includes('app_4') && (
                 <div className="space-y-6">
+                  {isAdminActive && onOpenComplaintsModal && (
+                    <div className="p-4 bg-gradient-to-r from-rose-950 to-slate-900 text-white rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md border border-rose-800/40">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-rose-500/20 text-rose-300 flex items-center justify-center font-black flex-shrink-0">
+                          <MessageSquareText className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-xs sm:text-sm">Pusat Kotak Masuk Pengaduan (LAPOR-RT)</p>
+                          <p className="text-[11px] text-slate-300">Terdapat {complaints.length} total laporan warga &amp; pegawai yang tersimpan</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveMicroApp(null);
+                          onOpenComplaintsModal();
+                        }}
+                        className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs shadow transition cursor-pointer flex items-center gap-1.5 flex-shrink-0"
+                      >
+                        <span>Buka Kotak Pengaduan</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+
                   <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex gap-3 items-start text-rose-900">
                     <AlertCircle className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" />
                     <div>
