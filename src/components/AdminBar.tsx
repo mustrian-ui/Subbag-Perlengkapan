@@ -1,4 +1,4 @@
-import { Settings, LogOut, AlertCircle, MessageSquareText } from 'lucide-react';
+import { Settings, LogOut, MessageSquareText, Layers, AlertCircle } from 'lucide-react';
 
 interface AdminBarProps {
   isActive: boolean;
@@ -6,6 +6,8 @@ interface AdminBarProps {
   complaintsCount?: number;
   newComplaintsCount?: number;
   onOpenComplaints?: () => void;
+  totalPendingReportsCount?: number;
+  onOpenServiceReports?: () => void;
 }
 
 export default function AdminBar({ 
@@ -13,7 +15,9 @@ export default function AdminBar({
   onLogout,
   complaintsCount = 0,
   newComplaintsCount = 0,
-  onOpenComplaints
+  onOpenComplaints,
+  totalPendingReportsCount = 0,
+  onOpenServiceReports
 }: AdminBarProps) {
   if (!isActive) return null;
 
@@ -25,10 +29,31 @@ export default function AdminBar({
           <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-100"></span>
         </span>
         <Settings className="w-3.5 h-3.5 inline animate-spin-slow" />
-        <span className="normal-case font-semibold">Mode Admin Aktif — Anda dapat mengelola layanan, galeri, jadwal, dan pengaduan</span>
+        <span className="normal-case font-semibold">Mode Admin Aktif — Kelola permohonan, jadwal, berkas, dan ambil tindakan langsung</span>
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
+        {onOpenServiceReports && (
+          <button
+            type="button"
+            onClick={onOpenServiceReports}
+            className="normal-case flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white font-extrabold transition cursor-pointer border border-emerald-400/40 shadow-sm"
+            title="Buka Pusat Tindakan Semua Layanan (SIPERUM, SIPAKAR, SILOGIS, LAPOR-RT)"
+          >
+            <Layers className="w-3.5 h-3.5 text-emerald-200" />
+            <span>Pusat Tindakan Layanan</span>
+            {totalPendingReportsCount > 0 ? (
+              <span className="px-1.5 py-0.2 bg-amber-400 text-slate-950 text-[10px] font-black rounded-full animate-pulse">
+                {totalPendingReportsCount} Perlu Aksi
+              </span>
+            ) : (
+              <span className="px-1.5 py-0.2 bg-emerald-700 text-emerald-100 text-[10px] font-bold rounded-full">
+                Siap
+              </span>
+            )}
+          </button>
+        )}
+
         {onOpenComplaints && (
           <button
             type="button"

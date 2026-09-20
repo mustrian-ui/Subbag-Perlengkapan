@@ -22,11 +22,12 @@ export interface Booking {
   tanggal: string;
   waktu: string;
   agenda: string;
-  status: 'Disetujui' | 'Menunggu Konfirmasi';
+  status: 'Disetujui' | 'Menunggu Konfirmasi' | 'Selesai' | 'Ditolak' | string;
   documentUrl?: string;
   documentName?: string;
   pemohon?: string;
   instansi?: string;
+  createdAt?: string;
 }
 
 export interface Vehicle {
@@ -34,22 +35,24 @@ export interface Vehicle {
   kendaraan: string;
   pemohon: string;
   tujuan: string;
-  status: 'Disetujui' | 'Menunggu Validasi' | 'Menunggu Konfirmasi';
+  status: 'Disetujui' | 'Menunggu Validasi' | 'Menunggu Konfirmasi' | 'Selesai' | 'Ditolak' | string;
   documentUrl?: string;
   documentName?: string;
   instansi?: string;
+  createdAt?: string;
 }
 
 export interface LogisticsRequest {
   id: string;
   barang: string;
   jumlah: string;
-  status: 'Selesai' | 'Diproses';
+  status: 'Selesai' | 'Diproses' | 'Menunggu Konfirmasi' | 'Ditolak' | string;
   documentUrl?: string;
   documentName?: string;
   kegiatan?: string;
   pemohon?: string;
   instansi?: string;
+  createdAt?: string;
 }
 
 export interface ToastMessage {

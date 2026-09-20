@@ -13,6 +13,7 @@ import LandingEditModal from './components/LandingEditModal';
 import GoogleSheetsPanel from './components/GoogleSheetsPanel';
 import GedungSchedule from './components/GedungSchedule';
 import ComplaintsModal from './components/ComplaintsModal';
+import ServiceReportsModal, { AppFilterType } from './components/ServiceReportsModal';
 import { getAccessToken, appendBookingToSheet, appendVehicleToSheet, appendLogisticsToSheet } from './lib/googleSheets';
 import { collection, onSnapshot, setDoc, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from './lib/firebase';
@@ -88,6 +89,10 @@ export default function App() {
   // Complaints dataset state (LAPOR-RT)
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [isComplaintsModalOpen, setIsComplaintsModalOpen] = useState<boolean>(false);
+
+  // Unified Actionable Service Reports Dashboard State (SIPERUM, SIPAKAR, SILOGIS, LAPOR-RT)
+  const [isServiceReportsModalOpen, setIsServiceReportsModalOpen] = useState<boolean>(false);
+  const [serviceReportsInitialFilter, setServiceReportsInitialFilter] = useState<AppFilterType>('all');
 
   // Firebase Auth state listener
   useEffect(() => {
@@ -628,6 +633,72 @@ export default function App() {
     }
   };
 
+  const handleUpdateBookingStatus = async (id: string, status: string) => {
+    try {
+      await updateDoc(doc(db, 'bookings', id), { status });
+      setBookings(prev => prev.map(b => b.id === id ? { ...b, status } : b));
+      triggerToast(`Status reservasi ruangan diperbarui menjadi "${status}"`, 'success');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `bookings/${id}`);
+      throw err;
+    }
+  };
+
+  const handleDeleteBooking = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'bookings', id));
+      setBookings(prev => prev.filter(b => b.id !== id));
+      triggerToast('Data permohonan ruangan berhasil dihapus', 'info');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `bookings/${id}`);
+      throw err;
+    }
+  };
+
+  const handleUpdateVehicleStatus = async (id: string, status: string) => {
+    try {
+      await updateDoc(doc(db, 'vehicles', id), { status });
+      setVehicles(prev => prev.map(v => v.id === id ? { ...v, status } : v));
+      triggerToast(`Status peminjaman kendaraan diperbarui menjadi "${status}"`, 'success');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `vehicles/${id}`);
+      throw err;
+    }
+  };
+
+  const handleDeleteVehicle = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'vehicles', id));
+      setVehicles(prev => prev.filter(v => v.id !== id));
+      triggerToast('Data peminjaman kendaraan berhasil dihapus', 'info');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `vehicles/${id}`);
+      throw err;
+    }
+  };
+
+  const handleUpdateLogisticsStatus = async (id: string, status: string) => {
+    try {
+      await updateDoc(doc(db, 'logistics', id), { status });
+      setLogistics(prev => prev.map(l => l.id === id ? { ...l, status } : l));
+      triggerToast(`Status permohonan logistik diperbarui menjadi "${status}"`, 'success');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `logistics/${id}`);
+      throw err;
+    }
+  };
+
+  const handleDeleteLogistics = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'logistics', id));
+      setLogistics(prev => prev.filter(l => l.id !== id));
+      triggerToast('Data permohonan logistik berhasil dihapus', 'info');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `logistics/${id}`);
+      throw err;
+    }
+  };
+
   const handleScrollToSection = (sectionId: string) => {
     const elem = document.getElementById(sectionId);
     if (elem) {
@@ -652,7 +723,17 @@ export default function App() {
         isActive={isAdminActive} 
         complaintsCount={complaints.length}
         newComplaintsCount={complaints.filter(c => c.status === 'Masuk').length}
+        totalPendingReportsCount={
+          bookings.filter(b => !b.status || b.status.toLowerCase().includes('menunggu') || b.status.toLowerCase().includes('pending')).length +
+          vehicles.filter(v => !v.status || v.status.toLowerCase().includes('menunggu') || v.status.toLowerCase().includes('pending')).length +
+          logistics.filter(l => !l.status || l.status.toLowerCase().includes('menunggu') || l.status.toLowerCase().includes('pending') || l.status.toLowerCase().includes('diproses')).length +
+          complaints.filter(c => c.status === 'Masuk').length
+        }
         onOpenComplaints={() => setIsComplaintsModalOpen(true)}
+        onOpenServiceReports={() => {
+          setServiceReportsInitialFilter('all');
+          setIsServiceReportsModalOpen(true);
+        }}
         onLogout={async () => {
           try {
             localStorage.removeItem('admin_bypass_active');
@@ -729,16 +810,29 @@ export default function App() {
           
           bookings={bookings}
           onAddBooking={handleAddBooking}
+          onUpdateBookingStatus={handleUpdateBookingStatus}
+          onDeleteBooking={handleDeleteBooking}
           
           vehicles={vehicles}
           onAddVehicle={handleAddVehicle}
+          onUpdateVehicleStatus={handleUpdateVehicleStatus}
+          onDeleteVehicle={handleDeleteVehicle}
           
           logistics={logistics}
           onAddLogistics={handleAddLogistics}
+          onUpdateLogisticsStatus={handleUpdateLogisticsStatus}
+          onDeleteLogistics={handleDeleteLogistics}
 
           complaints={complaints}
           onOpenComplaintsModal={() => setIsComplaintsModalOpen(true)}
           onAddComplaint={handleAddComplaint}
+          onUpdateComplaintStatus={handleUpdateComplaintStatus}
+          onDeleteComplaint={handleDeleteComplaint}
+
+          onOpenServiceReportsModal={(filter) => {
+            setServiceReportsInitialFilter(filter || 'all');
+            setIsServiceReportsModalOpen(true);
+          }}
           
           showToast={triggerToast}
         />
@@ -851,6 +945,27 @@ export default function App() {
         onClose={() => setIsComplaintsModalOpen(false)}
         complaints={complaints}
         onUpdateStatus={handleUpdateComplaintStatus}
+        onDeleteComplaint={handleDeleteComplaint}
+        showToast={triggerToast}
+      />
+
+      {/* 4.7. UNIFIED ALL-APPLICATION ACTIONABLE REPORTS MODAL (SIPERUM, SIPAKAR, SILOGIS, LAPOR-RT) */}
+      <ServiceReportsModal
+        isOpen={isServiceReportsModalOpen}
+        onClose={() => setIsServiceReportsModalOpen(false)}
+        initialAppFilter={serviceReportsInitialFilter}
+        isAdminActive={isAdminActive}
+        bookings={bookings}
+        vehicles={vehicles}
+        logistics={logistics}
+        complaints={complaints}
+        onUpdateBookingStatus={handleUpdateBookingStatus}
+        onDeleteBooking={handleDeleteBooking}
+        onUpdateVehicleStatus={handleUpdateVehicleStatus}
+        onDeleteVehicle={handleDeleteVehicle}
+        onUpdateLogisticsStatus={handleUpdateLogisticsStatus}
+        onDeleteLogistics={handleDeleteLogistics}
+        onUpdateComplaintStatus={handleUpdateComplaintStatus}
         onDeleteComplaint={handleDeleteComplaint}
         showToast={triggerToast}
       />
