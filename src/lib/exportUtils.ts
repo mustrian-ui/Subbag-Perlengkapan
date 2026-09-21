@@ -81,10 +81,33 @@ export function exportVehiclesCsv(vehicles: Vehicle[]) {
 }
 
 /**
- * Export SILOGIS / SajiRapat Logistics to CSV
+ * Export SILOGIS (Logistik & ATK) to CSV
  */
-export function exportLogisticsCsv(logistics: (LogisticsRequest | SajiRapatRequest)[]) {
-  exportSajiRapatCsv(logistics as SajiRapatRequest[]);
+export function exportLogisticsCsv(logistics: LogisticsRequest[]) {
+  exportSilogisCsv(logistics);
+}
+
+/**
+ * Export SILOGIS (Logistik & ATK Perlengkapan) to CSV
+ */
+export function exportSilogisCsv(requests: LogisticsRequest[]) {
+  const headers = ['No', 'ID Permintaan', 'Nama Barang / Logistik', 'Jumlah', 'Keperluan Kegiatan', 'Nama Pemohon', 'Instansi / OPD', 'Kontak', 'Status Permintaan', 'Tanggal'];
+  const rows = requests.map((r, idx) => [
+    idx + 1,
+    escapeCsv(r.id),
+    escapeCsv(r.barang),
+    escapeCsv(r.jumlah),
+    escapeCsv(r.kegiatan || '-'),
+    escapeCsv(r.pemohon || '-'),
+    escapeCsv(r.instansi || '-'),
+    escapeCsv(r.kontak || '-'),
+    escapeCsv(r.status),
+    escapeCsv(r.createdAt ? formatDate(r.createdAt) : '-')
+  ]);
+
+  const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\r\n');
+  const filename = `SILOGIS_Rekap_Logistik_ATK_${new Date().toISOString().slice(0, 10)}.csv`;
+  downloadFile(filename, csvContent);
 }
 
 /**

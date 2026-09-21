@@ -1,8 +1,9 @@
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { 
   Briefcase, 
   Car, 
   Box, 
+  Package,
   FileText, 
   ChevronRight, 
   Trash2, 
@@ -34,20 +35,107 @@ import { db } from '../lib/firebase';
 import { 
   getAccessToken, 
   getOrCreateDriveFolder, 
-  uploadFileToDrive 
+  uploadFileToDrive,
+  appendBookingToSheet,
+  appendVehicleToSheet,
+  appendSajiRapatToSheet,
+  appendCinderamataToSheet,
+  appendLogisticsToSheet,
+  appendComplaintToSheet
 } from '../lib/googleSheets';
 import { AppFilterType } from './ServiceReportsModal';
 
 export const getServiceType = (app: Application | null): AppFilterType => {
-  if (!app) return 'siperum';
+  if (!app) return 'sajirapat';
   const id = (app.id || '').toLowerCase();
-  const titleLower = (app.title || '').toLowerCase();
-  if (id.includes('app_1') || titleLower.includes('siperum') || titleLower.includes('ruang')) return 'siperum';
-  if (id.includes('app_2') || titleLower.includes('sipakar') || titleLower.includes('kendaraan') || titleLower.includes('mobil')) return 'sipakar';
-  if (id.includes('app_5') || titleLower.includes('sajirapat') || titleLower.includes('konsumsi') || app.category === 'consumption') return 'sajirapat';
-  if (id.includes('app_6') || titleLower.includes('petacendera') || titleLower.includes('cinderamata') || titleLower.includes('cendera') || app.category === 'souvenir') return 'petacendera';
-  if (id.includes('app_3') || titleLower.includes('silogis') || app.category === 'logistics') return 'silogis';
-  if (id.includes('app_4') || titleLower.includes('lapor') || app.category === 'public') return 'lapor';
+  const rawTitle = (app.title || '').toLowerCase();
+  const titleClean = rawTitle.replace(/[\s\-_()]+/g, '');
+  const cat = (app.category || '').toLowerCase();
+
+  // 1. SajiRapat / Konsumsi Rapat (prioritize detection)
+  if (
+    id.includes('saji') ||
+    id.includes('app_5') ||
+    cat === 'consumption' ||
+    titleClean.includes('sajirapat') ||
+    rawTitle.includes('saji rapat') ||
+    rawTitle.includes('saji') ||
+    rawTitle.includes('konsumsi') ||
+    rawTitle.includes('makan') ||
+    rawTitle.includes('snack') ||
+    rawTitle.includes('prasmanan') ||
+    rawTitle.includes('catering')
+  ) {
+    return 'sajirapat';
+  }
+
+  // 2. PetaCendera / Cinderamata & Plakat
+  if (
+    id.includes('cender') ||
+    id.includes('app_6') ||
+    cat === 'souvenir' ||
+    titleClean.includes('petacendera') ||
+    rawTitle.includes('peta cendera') ||
+    rawTitle.includes('cinderamata') ||
+    rawTitle.includes('cendera') ||
+    rawTitle.includes('plakat') ||
+    rawTitle.includes('souvenir') ||
+    rawTitle.includes('singal') ||
+    rawTitle.includes('padaw')
+  ) {
+    return 'petacendera';
+  }
+
+  // 3. SILOGIS / Logistik & ATK
+  if (
+    id.includes('logis') ||
+    id.includes('app_3') ||
+    cat === 'logistics' ||
+    titleClean.includes('silogis') ||
+    rawTitle.includes('logistik') ||
+    rawTitle.includes('atk') ||
+    rawTitle.includes('inventaris')
+  ) {
+    return 'silogis';
+  }
+
+  // 4. SIPAKAR / Kendaraan Dinas
+  if (
+    id.includes('pakar') ||
+    id.includes('app_2') ||
+    titleClean.includes('sipakar') ||
+    rawTitle.includes('kendaraan') ||
+    rawTitle.includes('mobil') ||
+    rawTitle.includes('armada') ||
+    rawTitle.includes('jalan')
+  ) {
+    return 'sipakar';
+  }
+
+  // 5. LAPOR-RT / Pengaduan
+  if (
+    id.includes('lapor') ||
+    id.includes('app_4') ||
+    cat === 'public' ||
+    titleClean.includes('laporrt') ||
+    rawTitle.includes('lapor') ||
+    rawTitle.includes('pengaduan') ||
+    rawTitle.includes('aduan')
+  ) {
+    return 'lapor';
+  }
+
+  // 6. SIPERUM / Ruangan
+  if (
+    id.includes('perum') ||
+    id.includes('app_1') ||
+    titleClean.includes('siperum') ||
+    rawTitle.includes('ruang') ||
+    rawTitle.includes('gedung')
+  ) {
+    return 'siperum';
+  }
+
   return 'siperum';
 };
 
@@ -125,7 +213,14 @@ export default function ServicePortalModal({
 }: ServicePortalModalProps) {
   if (!activeMicroApp) return null;
 
-  const activeServiceType = getServiceType(activeMicroApp);
+  const [activeServiceType, setActiveServiceType] = useState<AppFilterType>(() => getServiceType(activeMicroApp));
+
+  useEffect(() => {
+    if (activeMicroApp) {
+      setActiveServiceType(getServiceType(activeMicroApp));
+    }
+  }, [activeMicroApp]);
+
   const [isUploading, setIsUploading] = useState(false);
 
   // Form states - SIPERUM
@@ -150,8 +245,9 @@ export default function ServicePortalModal({
   const [sajiAcara, setSajiAcara] = useState('');
   const [sajiTgl, setSajiTgl] = useState('');
   const [sajiWaktu, setSajiWaktu] = useState('');
-  const [sajiLokasi, setSajiLokasi] = useState('Ruang Rapat Imbaya Lt. 2');
-  const [sajiJenisKonsumsi, setSajiJenisKonsumsi] = useState('Prasmanan & Snack');
+  const [sajiLokasi, setSajiLokasi] = useState('');
+  const [sajiJenisKonsumsi, setSajiJenisKonsumsi] = useState('Nasi Kotak');
+  const [sajiLainnya, setSajiLainnya] = useState('');
   const [sajiPorsi, setSajiPorsi] = useState('');
   const [sajiPemohon, setSajiPemohon] = useState('');
   const [sajiNip, setSajiNip] = useState('');
@@ -162,7 +258,7 @@ export default function ServicePortalModal({
   const [sajiDragOver, setSajiDragOver] = useState(false);
 
   // Form states - PetaCendera
-  const [cendJenis, setCendJenis] = useState('Plakat Kristal Kayu Khas Tarakan');
+  const [cendJenis, setCendJenis] = useState('Plakat');
   const [cendJumlah, setCendJumlah] = useState('');
   const [cendKeperluan, setCendKeperluan] = useState('');
   const [cendPenerima, setCendPenerima] = useState('');
@@ -197,12 +293,14 @@ export default function ServicePortalModal({
     setFile: (f: File | null) => void,
     dragOver: boolean,
     setDragOver: (b: boolean) => void,
-    accentColor: string = 'border-teal-300 hover:border-teal-500 hover:bg-slate-50'
+    accentColor: string = 'border-teal-300 hover:border-teal-500 hover:bg-slate-50',
+    customLabel: string = 'Surat Permohonan / Dokumen Resmi',
+    requiredBadge: string = 'Wajib Diunggah'
   ) => (
     <div className="space-y-1.5 mt-2">
       <label className="block text-xs font-black text-slate-700 flex items-center justify-between">
-        <span className="uppercase tracking-wider">Surat Permohonan / Dokumen Resmi</span>
-        <span className="text-[10px] font-extrabold text-rose-500 uppercase">Wajib Diunggah</span>
+        <span className="uppercase tracking-wider">{customLabel}</span>
+        <span className="text-[10px] font-extrabold text-rose-500 uppercase">{requiredBadge}</span>
       </label>
       <div
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -260,6 +358,22 @@ export default function ServicePortalModal({
     </div>
   );
 
+  // Helper for background auto-sync to Google Sheets if configured
+  const tryAutoSyncToSheet = async (syncFn: (token: string, sheetId: string) => Promise<any>) => {
+    try {
+      const isAutoSync = localStorage.getItem('pemkot_sheets_autosync') === 'true';
+      const sheetId = localStorage.getItem('pemkot_sheets_id');
+      if (isAutoSync && sheetId) {
+        const token = await getAccessToken();
+        if (token) {
+          await syncFn(token, sheetId);
+        }
+      }
+    } catch (err) {
+      console.warn('Background auto-sync to Google Sheets error (non-fatal):', err);
+    }
+  };
+
   // SUBMIT HANDLERS
   const handleSiperumSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -307,6 +421,7 @@ export default function ServicePortalModal({
       documentName: finalDocName
     };
     onAddBooking(newBooking);
+    tryAutoSyncToSheet((token, sId) => appendBookingToSheet(token, sId, newBooking));
     showToast(`Reservasi ${sipRuang} berhasil diajukan!`, 'success');
     setSipTgl('');
     setSipJam('');
@@ -361,6 +476,7 @@ export default function ServicePortalModal({
       documentName: finalDocName
     };
     onAddVehicle(newVehicle);
+    tryAutoSyncToSheet((token, sId) => appendVehicleToSheet(token, sId, newVehicle));
     showToast(`Permohonan armada ${sipCarUnit} berhasil didaftarkan!`, 'success');
     setSipCarUnit('');
     setSipCarDest('');
@@ -372,12 +488,16 @@ export default function ServicePortalModal({
 
   const handleSajiRapatSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!sajiAcara || !sajiTgl || !sajiWaktu || !sajiLokasi || !sajiPorsi || !sajiPemohon || !sajiInstansi) {
-      showToast('Harap lengkapi data acara, waktu, dan pemohon konsumsi!', 'error');
+    if (!sajiJenisKonsumsi || !sajiTgl || !sajiWaktu || !sajiLokasi || !sajiPorsi || !sajiAcara || !sajiPemohon || !sajiInstansi) {
+      showToast('Harap lengkapi semua kolom isian form Saji Rapat!', 'error');
+      return;
+    }
+    if (sajiJenisKonsumsi === 'Lainnya' && !sajiLainnya.trim()) {
+      showToast('Harap sebutkan jenis konsumsi lainnya!', 'error');
       return;
     }
     if (!sajiFile) {
-      showToast('Harap unggah Nota Dinas / Surat Permohonan Konsumsi!', 'error');
+      showToast('Surat / Dokumen Resmi (Srikandi) WAJIB DIUNGGAH!', 'error');
       return;
     }
     setIsUploading(true);
@@ -386,7 +506,7 @@ export default function ServicePortalModal({
     try {
       const token = await getAccessToken();
       if (token) {
-        showToast('Mengunggah Nota Dinas Konsumsi ke Google Drive...', 'info');
+        showToast('Mengunggah Dokumen Srikandi ke Google Drive...', 'info');
         const folderId = await getOrCreateDriveFolder(token);
         const uploadRes = await uploadFileToDrive(token, folderId, sajiFile);
         finalDocUrl = uploadRes.webViewLink;
@@ -403,13 +523,15 @@ export default function ServicePortalModal({
       setIsUploading(false);
     }
 
+    const finalJenis = sajiJenisKonsumsi === 'Lainnya' ? `Lainnya (${sajiLainnya.trim()})` : sajiJenisKonsumsi;
+
     const newSajiReq: SajiRapatRequest = {
       id: `saji_${Date.now()}`,
       acara: sajiAcara,
       tanggal: sajiTgl,
       waktu: sajiWaktu,
       lokasi: sajiLokasi,
-      jenisKonsumsi: sajiJenisKonsumsi,
+      jenisKonsumsi: finalJenis,
       porsi: parseInt(sajiPorsi, 10) || 0,
       pemohon: sajiPemohon,
       nip: sajiNip || undefined,
@@ -427,10 +549,14 @@ export default function ServicePortalModal({
     } else {
       await setDoc(doc(db, 'sajirapat', newSajiReq.id), newSajiReq);
     }
-    showToast(`Permintaan konsumsi untuk ${sajiAcara} (${sajiPorsi} porsi) berhasil dikirim!`, 'success');
+    tryAutoSyncToSheet((token, sId) => appendSajiRapatToSheet(token, sId, newSajiReq));
+    showToast(`Permintaan konsumsi ${finalJenis} untuk ${sajiAcara} (${sajiPorsi}) berhasil dikirim!`, 'success');
     setSajiAcara('');
     setSajiTgl('');
     setSajiWaktu('');
+    setSajiLokasi('');
+    setSajiJenisKonsumsi('Nasi Kotak');
+    setSajiLainnya('');
     setSajiPorsi('');
     setSajiPemohon('');
     setSajiNip('');
@@ -497,6 +623,7 @@ export default function ServicePortalModal({
     } else {
       await setDoc(doc(db, 'cinderamata', newCendReq.id), newCendReq);
     }
+    tryAutoSyncToSheet((token, sId) => appendCinderamataToSheet(token, sId, newCendReq));
     showToast(`Permohonan cinderamata (${cendJenis}) berhasil didaftarkan!`, 'success');
     setCendJumlah('');
     setCendKeperluan('');
@@ -556,6 +683,7 @@ export default function ServicePortalModal({
       documentName: finalDocName
     };
     onAddLogistics(newLogistics);
+    tryAutoSyncToSheet((token, sId) => appendLogisticsToSheet(token, sId, newLogistics));
     showToast(`Permintaan logistik ${silItem} (${silQty}) berhasil dikirim!`, 'success');
     setSilQty('');
     setSilDest('');
@@ -588,6 +716,7 @@ export default function ServicePortalModal({
     } else {
       await setDoc(doc(db, 'complaints', newComplaint.id), newComplaint);
     }
+    tryAutoSyncToSheet((token, sId) => appendComplaintToSheet(token, sId, newComplaint));
     showToast('Laporan pengaduan berhasil disampaikan ke Subbag RT!', 'success');
     setLapLoc('');
     setLapProblem('');
@@ -597,32 +726,65 @@ export default function ServicePortalModal({
     onClose();
   };
 
-  // Header background style
-  const getHeaderGradient = () => {
-    switch (activeMicroApp.category) {
-      case 'internal': return 'bg-gradient-to-r from-blue-900 to-teal-800';
-      case 'consumption': return 'bg-gradient-to-r from-orange-950 to-amber-750';
-      case 'souvenir': return 'bg-gradient-to-r from-purple-950 to-indigo-900';
-      case 'logistics': return 'bg-gradient-to-r from-slate-900 to-amber-700';
-      case 'public': return 'bg-gradient-to-r from-slate-900 to-rose-700';
-      default: return 'bg-gradient-to-r from-slate-900 to-teal-800';
+  // Get active service details for dynamic header & navigation
+  const getActiveServiceInfo = () => {
+    switch (activeServiceType) {
+      case 'sajirapat':
+        return {
+          title: 'SajiRapat (Konsumsi Rapat)',
+          desc: 'Fasilitasi penyediaan snack dan konsumsi makan rapat dinas, sosialisasi, dan agenda resmi Sekretariat Daerah Kota Tarakan.',
+          gradient: 'bg-gradient-to-r from-orange-950 via-amber-900 to-slate-900'
+        };
+      case 'sipakar':
+        return {
+          title: 'SIPAKAR (Layanan Kendaraan Dinas)',
+          desc: 'Permohonan surat izin jalan, peminjaman kendaraan operasional dinas, serta pemantauan armada dinas Setda.',
+          gradient: 'bg-gradient-to-r from-slate-900 via-amber-900 to-slate-900'
+        };
+      case 'petacendera':
+        return {
+          title: 'PetaCendera (Cinderamata & Plakat)',
+          desc: 'Permohonan cinderamata resmi daerah, plakat khas Kota Tarakan, dan souvenir kehormatan tamu dinas.',
+          gradient: 'bg-gradient-to-r from-purple-950 via-indigo-950 to-slate-900'
+        };
+      case 'silogis':
+        return {
+          title: 'SILOGIS (Inventaris & ATK)',
+          desc: 'Portal permintaan barang inventaris, alat tulis kantor (ATK), dan logistik rumah tangga secara digital & transparan.',
+          gradient: 'bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900'
+        };
+      case 'lapor':
+        return {
+          title: 'LAPOR-RT (Layanan Pengaduan)',
+          desc: 'Platform pelaporan kerusakan prasarana, gangguan kebersihan, dan perbaikan fasilitas gedung kantor Setda.',
+          gradient: 'bg-gradient-to-r from-slate-900 via-rose-950 to-slate-900'
+        };
+      case 'siperum':
+      default:
+        return {
+          title: 'SIPERUM (Pinjam Ruang Rapat)',
+          desc: 'Sistem Elektronik Reservasi Ruang Rapat pada Sekretariat Daerah Kota Tarakan. Lacak jadwal ruangan secara live.',
+          gradient: 'bg-gradient-to-r from-blue-900 to-teal-800'
+        };
     }
   };
+
+  const activeServiceInfo = getActiveServiceInfo();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
       <div className="bg-white rounded-3xl w-full max-w-4xl overflow-hidden shadow-2xl border border-slate-100 transform scale-100 transition-all duration-300 my-8">
         
         {/* Dynamic Modal Header matching application title */}
-        <div className={`p-6 text-white relative flex items-center justify-between ${getHeaderGradient()}`}>
+        <div className={`p-6 text-white relative flex items-center justify-between ${activeServiceInfo.gradient}`}>
           <div className="space-y-1">
             <span className="text-[10px] uppercase font-black tracking-widest text-slate-200 block">
               Portal Layanan Digital • Subbag RT &amp; Perlengkapan Setda Tarakan
             </span>
             <h3 className="text-lg sm:text-2xl font-black flex items-center gap-2 font-display">
-              {activeMicroApp.title}
+              {activeServiceInfo.title}
             </h3>
-            <p className="text-xs text-slate-200/90 max-w-xl line-clamp-1">{activeMicroApp.desc}</p>
+            <p className="text-xs text-slate-200/90 max-w-xl line-clamp-1">{activeServiceInfo.desc}</p>
           </div>
           <button
             onClick={onClose}
@@ -631,6 +793,42 @@ export default function ServicePortalModal({
           >
             <X className="w-5 h-5" />
           </button>
+        </div>
+
+        {/* Quick Service Switcher Tabs */}
+        <div className="bg-slate-100/90 border-b border-slate-200 px-4 py-2.5 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mr-1 shrink-0 hidden sm:inline">Pilih Layanan:</span>
+          {[
+            { id: 'sajirapat' as AppFilterType, label: 'SajiRapat (Konsumsi)', icon: Utensils, count: sajiRapat.length, activeClass: 'text-orange-950 bg-orange-100 border-orange-400 shadow-sm' },
+            { id: 'siperum' as AppFilterType, label: 'SIPERUM (Ruang Rapat)', icon: Briefcase, count: bookings.length, activeClass: 'text-teal-950 bg-teal-100 border-teal-400 shadow-sm' },
+            { id: 'sipakar' as AppFilterType, label: 'SIPAKAR (Kendaraan)', icon: Car, count: vehicles.length, activeClass: 'text-amber-950 bg-amber-100 border-amber-400 shadow-sm' },
+            { id: 'petacendera' as AppFilterType, label: 'PetaCendera (Plakat)', icon: Gift, count: cinderamata.length, activeClass: 'text-purple-950 bg-purple-100 border-purple-400 shadow-sm' },
+            { id: 'silogis' as AppFilterType, label: 'SILOGIS (ATK/Logistik)', icon: Package, count: logistics.length, activeClass: 'text-blue-950 bg-blue-100 border-blue-400 shadow-sm' },
+            { id: 'lapor' as AppFilterType, label: 'LAPOR-RT (Pengaduan)', icon: AlertTriangle, count: complaints.length, activeClass: 'text-rose-950 bg-rose-100 border-rose-400 shadow-sm' },
+          ].map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeServiceType === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveServiceType(tab.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shrink-0 cursor-pointer border ${
+                  isActive
+                    ? `${tab.activeClass} ring-1 ring-black/5 scale-[1.02]`
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5 shrink-0" />
+                <span>{tab.label}</span>
+                {tab.count > 0 && (
+                  <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ${isActive ? 'bg-black/10' : 'bg-slate-100 text-slate-500'}`}>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Modal Content Body */}
@@ -1043,117 +1241,200 @@ export default function ServicePortalModal({
               )}
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                <form onSubmit={handleSajiRapatSubmit} className="lg:col-span-5 space-y-4">
-                  <h4 className="font-extrabold text-xs uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-2 flex items-center justify-between">
-                    <span>Formulir Layanan: {activeMicroApp.title}</span>
-                    <span className="text-[10px] font-bold text-orange-700 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-200">
+                <form onSubmit={handleSajiRapatSubmit} className="lg:col-span-5 space-y-3.5 bg-slate-50/80 p-5 rounded-2xl border border-orange-200/70 shadow-sm">
+                  <div className="pb-2.5 border-b border-orange-200 flex items-center justify-between">
+                    <span className="flex items-center gap-2 font-black text-xs uppercase tracking-wider text-orange-950">
+                      <Utensils className="w-4 h-4 text-orange-600" />
+                      Form Layanan SajiRapat
+                    </span>
+                    <span className="text-[10px] font-black text-orange-800 bg-orange-100/80 px-2 py-0.5 rounded-full border border-orange-300">
                       Subbag RT &amp; Perlengkapan
                     </span>
-                  </h4>
+                  </div>
+
+                  {/* 1. Pilih Konsumsi */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Agenda / Nama Kegiatan Rapat</label>
+                    <label className="block text-xs font-black text-slate-800 mb-1.5 flex items-center justify-between">
+                      <span>Pilih Konsumsi :</span>
+                      <span className="text-[10px] text-orange-600 font-extrabold uppercase">Wajib Dipilih</span>
+                    </label>
+
+                    {/* Interactive Selection Pills */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mb-2">
+                      {[
+                        { id: 'Nasi Kotak', label: 'Nasi Kotak', icon: '🍱' },
+                        { id: 'Snack KotaK', label: 'Snack KotaK', icon: '🥪' },
+                        { id: 'Air Mineral', label: 'Air Mineral', icon: '💧' },
+                        { id: 'Prasmanan', label: 'Prasmanan', icon: '🍽️' },
+                        { id: 'Lainnya', label: 'Lainnya', icon: '✨' }
+                      ].map((opt) => {
+                        const isSelected = sajiJenisKonsumsi === opt.id || (opt.id === 'Snack KotaK' && sajiJenisKonsumsi.toLowerCase().includes('snack'));
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => setSajiJenisKonsumsi(opt.id)}
+                            className={`py-2 px-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 border cursor-pointer ${
+                              isSelected
+                                ? 'bg-orange-600 text-white border-orange-600 shadow-sm shadow-orange-500/20 ring-2 ring-orange-400/40'
+                                : 'bg-white text-slate-700 border-slate-200 hover:border-orange-300 hover:bg-orange-50/40'
+                            }`}
+                          >
+                            <span>{opt.icon}</span>
+                            <span>{opt.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Fallback Dropdown Select */}
+                    <select
+                      value={sajiJenisKonsumsi}
+                      onChange={(e) => setSajiJenisKonsumsi(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:outline-none bg-white font-bold text-slate-800"
+                    >
+                      <option value="Nasi Kotak">Nasi Kotak</option>
+                      <option value="Snack KotaK">Snack KotaK</option>
+                      <option value="Air Mineral">Air Mineral</option>
+                      <option value="Prasmanan">Prasmanan</option>
+                      <option value="Lainnya">Lainnya</option>
+                    </select>
+
+                    {sajiJenisKonsumsi === 'Lainnya' && (
+                      <input
+                        type="text"
+                        required
+                        placeholder="Sebutkan rincian jenis konsumsi lainnya..."
+                        value={sajiLainnya}
+                        onChange={(e) => setSajiLainnya(e.target.value)}
+                        className="w-full mt-2 px-3 py-2 border border-orange-300 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:outline-none bg-orange-50/40"
+                      />
+                    )}
+                  </div>
+
+                  {/* 2. Tgl. Kegiatan */}
+                  <div>
+                    <label className="block text-xs font-black text-slate-800 mb-1">
+                      Tgl. Kegiatan <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={sajiTgl}
+                      onChange={(e) => setSajiTgl(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:outline-none bg-white font-medium"
+                    />
+                  </div>
+
+                  {/* 3. Jam Kegiatan/Acara */}
+                  <div>
+                    <label className="block text-xs font-black text-slate-800 mb-1">
+                      Jam Kegiatan/Acara <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Contoh: 09:00 - 12:00 WITA"
+                      value={sajiWaktu}
+                      onChange={(e) => setSajiWaktu(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:outline-none bg-white font-medium"
+                    />
+                  </div>
+
+                  {/* 4. Lokasi Kegiatan */}
+                  <div>
+                    <label className="block text-xs font-black text-slate-800 mb-1">
+                      Lokasi Kegiatan <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Contoh: Ruang Rapat Imbaya Lt. 2 Kantor Walikota"
+                      value={sajiLokasi}
+                      onChange={(e) => setSajiLokasi(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:outline-none bg-white font-medium"
+                    />
+                  </div>
+
+                  {/* 5. Jumlah Permintaan */}
+                  <div>
+                    <label className="block text-xs font-black text-slate-800 mb-1">
+                      Jumlah Permintaan <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      required
+                      placeholder="Contoh: 50"
+                      value={sajiPorsi}
+                      onChange={(e) => setSajiPorsi(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:outline-none bg-white font-medium"
+                    />
+                  </div>
+
+                  {/* 6. Agenda/Nama Kegiatan */}
+                  <div>
+                    <label className="block text-xs font-black text-slate-800 mb-1">
+                      Agenda/Nama Kegiatan <span className="text-rose-500">*</span>
+                    </label>
                     <input
                       type="text"
                       required
                       placeholder="Contoh: Rapat Koordinasi Forum Komunikasi Pimpinan Daerah"
                       value={sajiAcara}
                       onChange={(e) => setSajiAcara(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-1 focus:ring-orange-500 focus:outline-none"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:outline-none bg-white font-medium"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Tanggal</label>
-                      <input
-                        type="date"
-                        required
-                        value={sajiTgl}
-                        onChange={(e) => setSajiTgl(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-1 focus:ring-orange-500 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Waktu / Jam</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="09:00 - 12:00 WITA"
-                        value={sajiWaktu}
-                        onChange={(e) => setSajiWaktu(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-1 focus:ring-orange-500 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Jenis Konsumsi</label>
-                      <select
-                        value={sajiJenisKonsumsi}
-                        onChange={(e) => setSajiJenisKonsumsi(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-1 focus:ring-orange-500 focus:outline-none bg-white font-semibold text-slate-800"
-                      >
-                        <option value="Prasmanan & Snack">Prasmanan &amp; Snack</option>
-                        <option value="Snack Box Saja">Snack Box Saja</option>
-                        <option value="Makan Siang Kotak">Makan Siang Kotak</option>
-                        <option value="Coffee Break & Kudapan">Coffee Break &amp; Kudapan</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Jumlah Porsi</label>
-                      <input
-                        type="number"
-                        min="1"
-                        required
-                        placeholder="Contoh: 50"
-                        value={sajiPorsi}
-                        onChange={(e) => setSajiPorsi(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-1 focus:ring-orange-500 focus:outline-none"
-                      />
-                    </div>
-                  </div>
+
+                  {/* 7. Nama Pejabat / Staff Pemohon */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Lokasi / Ruang Rapat</label>
+                    <label className="block text-xs font-black text-slate-800 mb-1">
+                      Nama Pejabat / Staff Pemohon <span className="text-rose-500">*</span>
+                    </label>
                     <input
                       type="text"
                       required
-                      placeholder="Contoh: Ruang Rapat Imbaya Lt. 2 Setda"
-                      value={sajiLokasi}
-                      onChange={(e) => setSajiLokasi(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-1 focus:ring-orange-500 focus:outline-none"
+                      placeholder="Contoh: H. Ahmad Rifai, S.STP"
+                      value={sajiPemohon}
+                      onChange={(e) => setSajiPemohon(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:outline-none bg-white font-medium"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Pejabat / Pemohon</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Nama Lengkap"
-                        value={sajiPemohon}
-                        onChange={(e) => setSajiPemohon(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-1 focus:ring-orange-500 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Bagian / Instansi</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Contoh: Bagian Umum"
-                        value={sajiInstansi}
-                        onChange={(e) => setSajiInstansi(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-1 focus:ring-orange-500 focus:outline-none"
-                      />
-                    </div>
+
+                  {/* 8. Dinas / Instansi */}
+                  <div>
+                    <label className="block text-xs font-black text-slate-800 mb-1">
+                      Dinas / Instansi <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Contoh: Bagian Umum / Diskominfo Kota Tarakan"
+                      value={sajiInstansi}
+                      onChange={(e) => setSajiInstansi(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:outline-none bg-white font-medium"
+                    />
                   </div>
-                  {renderFileUpload(sajiFile, setSajiFile, sajiDragOver, setSajiDragOver, 'border-orange-200 hover:border-orange-500 hover:bg-orange-50/20')}
+
+                  {/* 9. Upload Surat / Dokumen Resmi (Srikandi) (WAJIB DIUNGGAH) */}
+                  {renderFileUpload(
+                    sajiFile,
+                    setSajiFile,
+                    sajiDragOver,
+                    setSajiDragOver,
+                    'border-orange-300 hover:border-orange-500 hover:bg-orange-50/30',
+                    'Upload Surat / Dokumen Resmi (Srikandi)',
+                    'WAJIB DIUNGGAH'
+                  )}
+
                   <button
                     type="submit"
                     disabled={isUploading}
-                    className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-extrabold shadow-md transition duration-200 cursor-pointer disabled:opacity-55 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                    className="w-full py-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-black shadow-lg shadow-orange-600/20 transition duration-200 cursor-pointer disabled:opacity-55 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    {isUploading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                    <span>{isUploading ? 'Mengunggah Berkas...' : `Kirim Permohonan Konsumsi (${activeMicroApp.title})`}</span>
+                    {isUploading && <Loader2 className="w-4 h-4 animate-spin" />}
+                    <span>{isUploading ? 'Mengunggah Berkas Srikandi...' : 'Kirim Permohonan Konsumsi (SajiRapat)'}</span>
                   </button>
                 </form>
 
@@ -1278,17 +1559,17 @@ export default function ServicePortalModal({
                     </span>
                   </h4>
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Jenis Cinderamata / Plakat</label>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Jenis Cinderamata</label>
                     <select
                       value={cendJenis}
                       onChange={(e) => setCendJenis(e.target.value)}
                       className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-1 focus:ring-purple-500 focus:outline-none bg-white font-semibold text-slate-800"
                     >
-                      <option value="Plakat Kristal Kayu Khas Tarakan">Plakat Kristal Kayu Khas Tarakan</option>
-                      <option value="Plakat Akrilik Ukir Pemkot Tarakan">Plakat Akrilik Ukir Pemkot Tarakan</option>
-                      <option value="Kain Batik Khas Tarakan & Plakat Akrilik">Kain Batik Khas Tarakan &amp; Plakat Akrilik</option>
-                      <option value="Miniatur Rumah Adat Tidung">Miniatur Rumah Adat Tidung</option>
-                      <option value="Paket Souvenir Tamu Khusus Setda">Paket Souvenir Tamu Khusus Setda</option>
+                      <option value="Plakat">Plakat</option>
+                      <option value="Padaw">Padaw</option>
+                      <option value="Singal">Singal</option>
+                      <option value="Syal">Syal</option>
+                      <option value="Kain Batik">Kain Batik</option>
                     </select>
                   </div>
                   <div className="grid grid-cols-2 gap-2">

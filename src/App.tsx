@@ -989,6 +989,8 @@ export default function App() {
             <GoogleSheetsPanel 
               bookings={bookings}
               vehicles={vehicles}
+              sajiRapat={sajiRapat}
+              cinderamata={cinderamata}
               logistics={logistics}
               complaints={complaints}
               onShowToast={triggerToast}
@@ -1173,6 +1175,8 @@ export default function App() {
         onDeleteVehicle={handleDeleteVehicle}
         onUpdateLogisticsStatus={handleUpdateLogisticsStatus}
         onDeleteLogistics={handleDeleteLogistics}
+        onUpdateSajiRapatStatus={handleUpdateSajiRapatStatus}
+        onDeleteSajiRapat={handleDeleteSajiRapat}
         onUpdateCinderamataStatus={handleUpdateCinderamataStatus}
         onDeleteCinderamata={handleDeleteCinderamata}
         onUpdateComplaintStatus={handleUpdateComplaintStatus}

@@ -72,7 +72,13 @@ export const googleSignOut = async () => {
 };
 
 /**
- * Creates a brand new Google Spreadsheet with three tabs: Peminjaman Ruang, Peminjaman Kendaraan, Permintaan Logistik
+ * Creates a brand new Google Spreadsheet with six tabs corresponding to all micro-apps:
+ * 1. Peminjaman Ruang (SIPERUM)
+ * 2. Peminjaman Kendaraan (SIPAKAR)
+ * 3. Konsumsi Rapat (SajiRapat)
+ * 4. Cinderamata Daerah (PetaCendera)
+ * 5. Logistik & ATK (SILOGIS)
+ * 6. Pengaduan Fasilitas (LAPOR-RT)
  * and populates their column headers automatically.
  */
 export const createServiceSpreadsheet = async (accessToken: string): Promise<string> => {
@@ -91,7 +97,7 @@ export const createServiceSpreadsheet = async (accessToken: string): Promise<str
           {
             properties: {
               title: 'Peminjaman Ruang',
-              gridProperties: { rowCount: 1000, columnCount: 10 },
+              gridProperties: { rowCount: 1000, columnCount: 12 },
             }
           },
           {
@@ -102,8 +108,26 @@ export const createServiceSpreadsheet = async (accessToken: string): Promise<str
           },
           {
             properties: {
-              title: 'Permintaan Logistik',
-              gridProperties: { rowCount: 1000, columnCount: 10 },
+              title: 'Konsumsi Rapat',
+              gridProperties: { rowCount: 1000, columnCount: 14 },
+            }
+          },
+          {
+            properties: {
+              title: 'Cinderamata Daerah',
+              gridProperties: { rowCount: 1000, columnCount: 13 },
+            }
+          },
+          {
+            properties: {
+              title: 'Logistik & ATK',
+              gridProperties: { rowCount: 1000, columnCount: 11 },
+            }
+          },
+          {
+            properties: {
+              title: 'Pengaduan Sarpras',
+              gridProperties: { rowCount: 1000, columnCount: 11 },
             }
           }
         ]
@@ -122,7 +146,7 @@ export const createServiceSpreadsheet = async (accessToken: string): Promise<str
       throw new Error('Gagal mendapatkan ID Spreadsheet dari respons Google Sheets.');
     }
 
-    // Initialize Column Headers via Batch Update
+    // Initialize Column Headers for all 6 applications via Batch Update
     const initResponse = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`, {
       method: 'POST',
       headers: {
@@ -145,9 +169,27 @@ export const createServiceSpreadsheet = async (accessToken: string): Promise<str
             ]
           },
           {
-            range: "'Permintaan Logistik'!A1:J1",
+            range: "'Konsumsi Rapat'!A1:M1",
             values: [
-              ['ID Permintaan', 'Nama Barang', 'Jumlah', 'Kegiatan', 'Nama Pejabat / Staff Pemohon', 'Dinas / Instansi', 'Status Permintaan', 'Waktu Dibuat', 'Tautan Dokumen', 'Nama Dokumen']
+              ['ID Permohonan', 'Agenda / Nama Kegiatan', 'Pilih Konsumsi', 'Tanggal Kegiatan', 'Jam Kegiatan', 'Lokasi Kegiatan', 'Jumlah Permintaan', 'Nama Pejabat / Staff Pemohon', 'Dinas / Instansi', 'Status', 'Waktu Dibuat', 'Tautan Dokumen Srikandi', 'Nama Dokumen']
+            ]
+          },
+          {
+            range: "'Cinderamata Daerah'!A1:L1",
+            values: [
+              ['ID Permohonan', 'Jenis Cinderamata', 'Jumlah Permintaan', 'Keperluan / Acara', 'Tanggal Diperlukan', 'Nama Tamu / Penerima', 'Nama Pejabat / Pemohon', 'Dinas / Instansi', 'Status', 'Waktu Dibuat', 'Tautan Dokumen', 'Nama Dokumen']
+            ]
+          },
+          {
+            range: "'Logistik & ATK'!A1:J1",
+            values: [
+              ['ID Permintaan', 'Nama Barang / Logistik', 'Jumlah', 'Kegiatan', 'Nama Pejabat / Staff Pemohon', 'Dinas / Instansi', 'Status Permintaan', 'Waktu Dibuat', 'Tautan Dokumen', 'Nama Dokumen']
+            ]
+          },
+          {
+            range: "'Pengaduan Sarpras'!A1:J1",
+            values: [
+              ['ID Aduan', 'Waktu Masuk', 'Nama Pelapor', 'NIP Pelapor', 'Unit / Bagian OPD', 'Kategori Kerusakan', 'Lokasi / Ruang', 'Uraian Pengaduan', 'Status Penanganan', 'Waktu Pembaruan']
             ]
           }
         ]
@@ -167,7 +209,7 @@ export const createServiceSpreadsheet = async (accessToken: string): Promise<str
 };
 
 /**
- * Appends a booking transaction to the specified Spreadsheet.
+ * Appends a booking transaction (SIPERUM) to the specified Spreadsheet.
  */
 export const appendBookingToSheet = async (
   accessToken: string,
@@ -193,7 +235,7 @@ export const appendBookingToSheet = async (
 };
 
 /**
- * Appends a vehicle booking to the specified Spreadsheet.
+ * Appends a vehicle booking (SIPAKAR) to the specified Spreadsheet.
  */
 export const appendVehicleToSheet = async (
   accessToken: string,
@@ -217,7 +259,62 @@ export const appendVehicleToSheet = async (
 };
 
 /**
- * Appends a logistics order to the specified Spreadsheet.
+ * Appends a meeting catering request (SajiRapat) to the specified Spreadsheet.
+ */
+export const appendSajiRapatToSheet = async (
+  accessToken: string,
+  spreadsheetId: string,
+  request: { id: string; acara?: string; jenisKonsumsi?: string; tanggal?: string; waktu?: string; lokasi?: string; porsi?: string | number; pemohon?: string; instansi?: string; status: string; documentUrl?: string; documentName?: string }
+) => {
+  const timestamp = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Makassar' });
+  const rowValues = [
+    request.id,
+    request.acara || '',
+    request.jenisKonsumsi || '',
+    request.tanggal || '',
+    request.waktu || '',
+    request.lokasi || '',
+    request.porsi || '',
+    request.pemohon || '',
+    request.instansi || '',
+    request.status,
+    timestamp,
+    request.documentUrl || '',
+    request.documentName || ''
+  ];
+
+  return appendRowToSheet(accessToken, spreadsheetId, 'Konsumsi Rapat', rowValues);
+};
+
+/**
+ * Appends a souvenir / plaque request (PetaCendera) to the specified Spreadsheet.
+ */
+export const appendCinderamataToSheet = async (
+  accessToken: string,
+  spreadsheetId: string,
+  request: { id: string; jenisCinderamata: string; jumlah: string | number; keperluan: string; tanggalPerlu: string; penerima?: string; pemohon: string; instansi: string; status: string; documentUrl?: string; documentName?: string }
+) => {
+  const timestamp = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Makassar' });
+  const rowValues = [
+    request.id,
+    request.jenisCinderamata,
+    request.jumlah,
+    request.keperluan,
+    request.tanggalPerlu,
+    request.penerima || '-',
+    request.pemohon,
+    request.instansi,
+    request.status,
+    timestamp,
+    request.documentUrl || '',
+    request.documentName || ''
+  ];
+
+  return appendRowToSheet(accessToken, spreadsheetId, 'Cinderamata Daerah', rowValues);
+};
+
+/**
+ * Appends a logistics & supplies order (SILOGIS) to the specified Spreadsheet.
  */
 export const appendLogisticsToSheet = async (
   accessToken: string,
@@ -238,7 +335,88 @@ export const appendLogisticsToSheet = async (
     logistics.documentName || ''
   ];
 
-  return appendRowToSheet(accessToken, spreadsheetId, 'Permintaan Logistik', rowValues);
+  return appendRowToSheet(accessToken, spreadsheetId, 'Logistik & ATK', rowValues);
+};
+
+/**
+ * Appends a maintenance complaint (LAPOR-RT) to the specified Spreadsheet.
+ */
+export const appendComplaintToSheet = async (
+  accessToken: string,
+  spreadsheetId: string,
+  complaint: { id: string; createdAt: string; name: string; nip?: string; bagian: string; type: string; location?: string; message: string; status: string }
+) => {
+  const timestamp = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Makassar' });
+  const rowValues = [
+    complaint.id,
+    complaint.createdAt || timestamp,
+    complaint.name,
+    complaint.nip || '-',
+    complaint.bagian,
+    complaint.type,
+    complaint.location || '-',
+    complaint.message,
+    complaint.status,
+    timestamp
+  ];
+
+  return appendRowToSheet(accessToken, spreadsheetId, 'Pengaduan Sarpras', rowValues);
+};
+
+/**
+ * Bulk synchronizes all 6 services data to the Google Spreadsheet.
+ */
+export const syncAllServicesToSpreadsheet = async (
+  accessToken: string,
+  spreadsheetId: string,
+  data: {
+    bookings: any[];
+    vehicles: any[];
+    sajiRapat: any[];
+    cinderamata: any[];
+    logistics: any[];
+    complaints: any[];
+  }
+): Promise<{ success: boolean; totalRowsSynced: number }> => {
+  let totalRowsSynced = 0;
+
+  // 1. Sync Bookings (SIPERUM)
+  for (const b of data.bookings) {
+    await appendBookingToSheet(accessToken, spreadsheetId, b);
+    totalRowsSynced++;
+  }
+
+  // 2. Sync Vehicles (SIPAKAR)
+  for (const v of data.vehicles) {
+    await appendVehicleToSheet(accessToken, spreadsheetId, v);
+    totalRowsSynced++;
+  }
+
+  // 3. Sync SajiRapat
+  for (const s of data.sajiRapat) {
+    await appendSajiRapatToSheet(accessToken, spreadsheetId, s);
+    totalRowsSynced++;
+  }
+
+  // 4. Sync Cinderamata (PetaCendera)
+  for (const c of data.cinderamata) {
+    await appendCinderamataToSheet(accessToken, spreadsheetId, c);
+    totalRowsSynced++;
+  }
+
+  // 5. Sync Logistics (SILOGIS)
+  for (const l of data.logistics) {
+    await appendLogisticsToSheet(accessToken, spreadsheetId, l);
+    totalRowsSynced++;
+  }
+
+  // 6. Sync Complaints (LAPOR-RT)
+  for (const comp of data.complaints) {
+    await appendComplaintToSheet(accessToken, spreadsheetId, comp);
+    totalRowsSynced++;
+  }
+
+  return { success: true, totalRowsSynced };
 };
 
 /**

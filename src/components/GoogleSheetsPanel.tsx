@@ -17,7 +17,8 @@ import {
   MessageSquareWarning, 
   Info,
   Layers,
-  ChevronRight
+  Utensils,
+  Gift
 } from 'lucide-react';
 import { 
   googleSignIn, 
@@ -27,29 +28,39 @@ import {
   verifySpreadsheetPermissions,
   appendBookingToSheet,
   appendVehicleToSheet,
-  appendLogisticsToSheet
+  appendLogisticsToSheet,
+  appendSajiRapatToSheet,
+  appendCinderamataToSheet,
+  appendComplaintToSheet,
+  syncAllServicesToSpreadsheet
 } from '../lib/googleSheets';
 import { 
   exportBookingsCsv, 
   exportVehiclesCsv, 
   exportLogisticsCsv, 
+  exportSajiRapatCsv,
+  exportCinderamataCsv,
   exportComplaintsCsv 
 } from '../lib/exportUtils';
-import { Booking, Vehicle, LogisticsRequest, Complaint } from '../types';
+import { Booking, Vehicle, LogisticsRequest, SajiRapatRequest, CinderamataRequest, Complaint } from '../types';
 import { User } from 'firebase/auth';
 
 interface GoogleSheetsPanelProps {
   bookings: Booking[];
   vehicles: Vehicle[];
   logistics: LogisticsRequest[];
+  sajiRapat?: SajiRapatRequest[];
+  cinderamata?: CinderamataRequest[];
   complaints?: Complaint[];
   onShowToast: (message: string, type: 'success' | 'error' | 'info') => void;
 }
 
 export default function GoogleSheetsPanel({
-  bookings,
-  vehicles,
-  logistics,
+  bookings = [],
+  vehicles = [],
+  logistics = [],
+  sajiRapat = [],
+  cinderamata = [],
   complaints = [],
   onShowToast
 }: GoogleSheetsPanelProps) {
@@ -100,12 +111,12 @@ export default function GoogleSheetsPanel({
       return 'Domain aplikasi web ini belum didaftarkan dalam daftar "Authorized Domains" pada konsol Firebase Authentication.';
     }
     if (code === 'auth/popup-blocked') {
-      return 'Jendela pop-up Google Sign-In diblokir oleh peramban karena aplikasi dibuka di dalam frame pratinjau (iframe). Buka aplikasi di tab baru agar pop-up diizinkan.';
+      return 'Pop-up otentikasi Google diblokir oleh peramban (browser). Harap izinkan pop-up untuk situs ini.';
     }
-    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
-      return 'Jendela pop-up Google ditutup sebelum otentikasi akun selesai.';
+    if (code === 'auth/popup-closed-by-user') {
+      return 'Jendela masuk Google ditutup sebelum proses verifikasi selesai.';
     }
-    return message || 'Koneksi ke server Google terputus atau tidak diizinkan.';
+    return message || 'Otentikasi Google ditolak oleh sistem keamanan peramban atau konfigurasi OAuth.';
   };
 
   const handleSignIn = async () => {
@@ -117,13 +128,12 @@ export default function GoogleSheetsPanel({
         setCurrentUser(result.user);
         setAccessToken(result.accessToken);
         setActiveTab('cloud');
-        onShowToast(`Berhasil terhubung sebagai ${result.user.email}!`, 'success');
+        onShowToast(`Selamat datang, ${result.user.displayName || result.user.email}! Google Sheets terhubung.`, 'success');
       }
     } catch (error: any) {
-      console.error('Google Sign-in error:', error);
-      const friendlyReason = parseAuthError(error);
-      setAuthErrorReason(friendlyReason);
-      onShowToast(`Gagal menghubungkan Google: ${friendlyReason}`, 'error');
+      const friendlyMessage = parseAuthError(error);
+      setAuthErrorReason(friendlyMessage);
+      onShowToast(friendlyMessage, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -154,7 +164,7 @@ export default function GoogleSheetsPanel({
       const newId = await createServiceSpreadsheet(accessToken);
       setSpreadsheetId(newId);
       localStorage.setItem('pemkot_sheets_id', newId);
-      onShowToast('Spreadsheet baru berhasil dibuat di Google Drive Anda!', 'success');
+      onShowToast('Spreadsheet baru lengkap dengan 6 tab layanan berhasil dibuat di Google Drive Anda!', 'success');
     } catch (error: any) {
       console.error(error);
       onShowToast(`Gagal membuat spreadsheet: ${error.message}`, 'error');
@@ -200,7 +210,7 @@ export default function GoogleSheetsPanel({
     }
   };
 
-  // Direct CSV Downloads (100% Reliable, No OAuth Required)
+  // Direct CSV Downloads for all 6 Micro-Apps
   const handleDownloadBookings = () => {
     if (bookings.length === 0) {
       onShowToast('Belum ada data reservasi ruang rapat untuk diunduh.', 'info');
@@ -219,13 +229,31 @@ export default function GoogleSheetsPanel({
     onShowToast(`File CSV ${vehicles.length} baris data Kendaraan Dinas berhasil diunduh!`, 'success');
   };
 
+  const handleDownloadSajiRapat = () => {
+    if (sajiRapat.length === 0) {
+      onShowToast('Belum ada data permohonan konsumsi rapat untuk diunduh.', 'info');
+      return;
+    }
+    exportSajiRapatCsv(sajiRapat);
+    onShowToast(`File CSV ${sajiRapat.length} baris data SajiRapat berhasil diunduh!`, 'success');
+  };
+
+  const handleDownloadCinderamata = () => {
+    if (cinderamata.length === 0) {
+      onShowToast('Belum ada data permohonan cinderamata untuk diunduh.', 'info');
+      return;
+    }
+    exportCinderamataCsv(cinderamata);
+    onShowToast(`File CSV ${cinderamata.length} baris data PetaCendera berhasil diunduh!`, 'success');
+  };
+
   const handleDownloadLogistics = () => {
     if (logistics.length === 0) {
       onShowToast('Belum ada data permintaan ATK/logistik untuk diunduh.', 'info');
       return;
     }
     exportLogisticsCsv(logistics);
-    onShowToast(`File CSV ${logistics.length} baris data ATK & Logistik berhasil diunduh!`, 'success');
+    onShowToast(`File CSV ${logistics.length} baris data ATK & Logistik (SILOGIS) berhasil diunduh!`, 'success');
   };
 
   const handleDownloadComplaints = () => {
@@ -239,20 +267,21 @@ export default function GoogleSheetsPanel({
 
   const handleDownloadAll = () => {
     handleDownloadBookings();
-    setTimeout(handleDownloadVehicles, 300);
-    setTimeout(handleDownloadLogistics, 600);
-    setTimeout(handleDownloadComplaints, 900);
-    onShowToast('Semua paket rekap data pelayanan (4 file CSV) mulai diunduh!', 'success');
+    setTimeout(handleDownloadVehicles, 250);
+    setTimeout(handleDownloadSajiRapat, 500);
+    setTimeout(handleDownloadCinderamata, 750);
+    setTimeout(handleDownloadLogistics, 1000);
+    setTimeout(handleDownloadComplaints, 1250);
+    onShowToast('Semua paket rekap data 6 aplikasi pelayanan (CSV) mulai diunduh!', 'success');
   };
 
-  // Bulk Export Handlers via Direct API
+  // Bulk Export Handlers via Direct Google Sheets API
   const handleExportBookings = async () => {
     if (!accessToken || !spreadsheetId) return;
     if (bookings.length === 0) {
       onShowToast('Tidak ada data Peminjaman Ruang untuk diekspor.', 'info');
       return;
     }
-
     setIsLoading(true);
     try {
       let count = 0;
@@ -260,7 +289,7 @@ export default function GoogleSheetsPanel({
         await appendBookingToSheet(accessToken, spreadsheetId, booking);
         count++;
       }
-      onShowToast(`Sukses mengekspor ${count} antrean Peminjaman Ruang!`, 'success');
+      onShowToast(`Sukses mengekspor ${count} data Peminjaman Ruang ke Sheets!`, 'success');
     } catch (error: any) {
       onShowToast(`Gagal mengekspor data: ${error.message}`, 'error');
     } finally {
@@ -271,10 +300,9 @@ export default function GoogleSheetsPanel({
   const handleExportVehicles = async () => {
     if (!accessToken || !spreadsheetId) return;
     if (vehicles.length === 0) {
-      onShowToast('Tidak ada data Peminjaman Kendaraan untuk diekspor.', 'info');
+      onShowToast('Tidak ada data Kendaraan Dinas untuk diekspor.', 'info');
       return;
     }
-
     setIsLoading(true);
     try {
       let count = 0;
@@ -282,7 +310,49 @@ export default function GoogleSheetsPanel({
         await appendVehicleToSheet(accessToken, spreadsheetId, vehicle);
         count++;
       }
-      onShowToast(`Sukses mengekspor ${count} antrean Peminjaman Kendaraan!`, 'success');
+      onShowToast(`Sukses mengekspor ${count} data Kendaraan Dinas ke Sheets!`, 'success');
+    } catch (error: any) {
+      onShowToast(`Gagal mengekspor data: ${error.message}`, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleExportSajiRapat = async () => {
+    if (!accessToken || !spreadsheetId) return;
+    if (sajiRapat.length === 0) {
+      onShowToast('Tidak ada data SajiRapat untuk diekspor.', 'info');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      let count = 0;
+      for (const s of sajiRapat) {
+        await appendSajiRapatToSheet(accessToken, spreadsheetId, s);
+        count++;
+      }
+      onShowToast(`Sukses mengekspor ${count} data Konsumsi Rapat ke Sheets!`, 'success');
+    } catch (error: any) {
+      onShowToast(`Gagal mengekspor data: ${error.message}`, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleExportCinderamata = async () => {
+    if (!accessToken || !spreadsheetId) return;
+    if (cinderamata.length === 0) {
+      onShowToast('Tidak ada data PetaCendera untuk diekspor.', 'info');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      let count = 0;
+      for (const c of cinderamata) {
+        await appendCinderamataToSheet(accessToken, spreadsheetId, c);
+        count++;
+      }
+      onShowToast(`Sukses mengekspor ${count} data Cinderamata ke Sheets!`, 'success');
     } catch (error: any) {
       onShowToast(`Gagal mengekspor data: ${error.message}`, 'error');
     } finally {
@@ -293,10 +363,9 @@ export default function GoogleSheetsPanel({
   const handleExportLogistics = async () => {
     if (!accessToken || !spreadsheetId) return;
     if (logistics.length === 0) {
-      onShowToast('Tidak ada data Permintaan Logistik untuk diekspor.', 'info');
+      onShowToast('Tidak ada data Logistik & ATK untuk diekspor.', 'info');
       return;
     }
-
     setIsLoading(true);
     try {
       let count = 0;
@@ -304,9 +373,50 @@ export default function GoogleSheetsPanel({
         await appendLogisticsToSheet(accessToken, spreadsheetId, req);
         count++;
       }
-      onShowToast(`Sukses mengekspor ${count} antrean Permintaan Logistik!`, 'success');
+      onShowToast(`Sukses mengekspor ${count} data Logistik & ATK ke Sheets!`, 'success');
     } catch (error: any) {
       onShowToast(`Gagal mengekspor data: ${error.message}`, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleExportComplaints = async () => {
+    if (!accessToken || !spreadsheetId) return;
+    if (complaints.length === 0) {
+      onShowToast('Tidak ada data Pengaduan untuk diekspor.', 'info');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      let count = 0;
+      for (const c of complaints) {
+        await appendComplaintToSheet(accessToken, spreadsheetId, c);
+        count++;
+      }
+      onShowToast(`Sukses mengekspor ${count} data Pengaduan ke Sheets!`, 'success');
+    } catch (error: any) {
+      onShowToast(`Gagal mengekspor data: ${error.message}`, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSyncAllDirect = async () => {
+    if (!accessToken || !spreadsheetId) return;
+    setIsLoading(true);
+    try {
+      const res = await syncAllServicesToSpreadsheet(accessToken, spreadsheetId, {
+        bookings,
+        vehicles,
+        sajiRapat,
+        cinderamata,
+        logistics,
+        complaints
+      });
+      onShowToast(`Sukses sinkronisasi massal seluruh ${res.totalRowsSynced} data ke Google Sheets!`, 'success');
+    } catch (error: any) {
+      onShowToast(`Gagal sinkronisasi data: ${error.message}`, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -330,11 +440,11 @@ export default function GoogleSheetsPanel({
                 Modul Integrasi Google Sheets &amp; Ekspor Data
               </h3>
               <span className="text-[10px] bg-emerald-100 text-emerald-800 font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                Siap Pakai
+                6 Aplikasi
               </span>
             </div>
             <p className="text-xs text-slate-500 font-medium mt-0.5">
-              Kelola, unduh, dan arsipkan seluruh data pelayanan publik kota ke format Spreadsheet (Excel/Google Sheets)
+              Kelola, unduh, dan arsipkan seluruh data pelayanan (SIPERUM, SIPAKAR, SajiRapat, PetaCendera, SILOGIS, LAPOR-RT) ke Google Sheets &amp; Excel
             </p>
           </div>
         </div>
@@ -405,13 +515,13 @@ export default function GoogleSheetsPanel({
                 className="flex-1 md:flex-initial inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl shadow-sm transition active:scale-95 cursor-pointer whitespace-nowrap"
               >
                 <Layers className="w-3.5 h-3.5" />
-                <span>Unduh Semua Data</span>
+                <span>Unduh Semua Data (6 CSV)</span>
               </button>
             </div>
           </div>
 
-          {/* Cards for each module */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Cards for each of the 6 micro-apps */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             
             {/* Card 1: Peminjaman Ruang (SIPERUM) */}
             <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex flex-col justify-between hover:border-emerald-400 hover:shadow-md transition">
@@ -469,56 +579,112 @@ export default function GoogleSheetsPanel({
               </button>
             </div>
 
-            {/* Card 3: Permintaan ATK / Logistik (SILOGIS) */}
+            {/* Card 3: Konsumsi Rapat (SajiRapat) */}
             <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex flex-col justify-between hover:border-emerald-400 hover:shadow-md transition">
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <div className="p-2 bg-rose-50 text-rose-700 rounded-xl">
-                    <Package className="w-5 h-5" />
+                  <div className="p-2 bg-orange-50 text-orange-700 rounded-xl">
+                    <Utensils className="w-5 h-5" />
                   </div>
-                  <span className="text-[10px] font-black uppercase tracking-wider bg-rose-100 text-rose-800 px-2 py-0.5 rounded">
-                    SILOGIS
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-orange-100 text-orange-800 px-2 py-0.5 rounded">
+                    SajiRapat
                   </span>
                 </div>
                 <div>
-                  <h5 className="font-extrabold text-slate-900 text-sm">Logistik &amp; ATK</h5>
+                  <h5 className="font-extrabold text-slate-900 text-sm">Konsumsi Rapat</h5>
                   <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                    Total {logistics.length} baris permintaan barang
+                    Total {sajiRapat.length} baris permintaan snack &amp; nasi kotak
                   </p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={handleDownloadLogistics}
-                className="mt-4 w-full flex items-center justify-center gap-1.5 px-3.5 py-2 bg-rose-700 hover:bg-rose-600 text-white text-xs font-extrabold rounded-xl transition cursor-pointer active:scale-95 shadow-sm"
+                onClick={handleDownloadSajiRapat}
+                className="mt-4 w-full flex items-center justify-center gap-1.5 px-3.5 py-2 bg-orange-700 hover:bg-orange-600 text-white text-xs font-extrabold rounded-xl transition cursor-pointer active:scale-95 shadow-sm"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Unduh Rekap CSV</span>
               </button>
             </div>
 
-            {/* Card 4: Pengaduan Masuk (LAPOR-RT) */}
+            {/* Card 4: Cinderamata Daerah (PETACENDERA) */}
+            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex flex-col justify-between hover:border-emerald-400 hover:shadow-md transition">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="p-2 bg-purple-50 text-purple-700 rounded-xl">
+                    <Gift className="w-5 h-5" />
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-purple-100 text-purple-800 px-2 py-0.5 rounded">
+                    PETACENDERA
+                  </span>
+                </div>
+                <div>
+                  <h5 className="font-extrabold text-slate-900 text-sm">Cinderamata Daerah</h5>
+                  <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                    Total {cinderamata.length} baris plakat, padaw, singal, batik
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleDownloadCinderamata}
+                className="mt-4 w-full flex items-center justify-center gap-1.5 px-3.5 py-2 bg-purple-700 hover:bg-purple-600 text-white text-xs font-extrabold rounded-xl transition cursor-pointer active:scale-95 shadow-sm"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Unduh Rekap CSV</span>
+              </button>
+            </div>
+
+            {/* Card 5: Permintaan ATK / Logistik (SILOGIS) */}
             <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex flex-col justify-between hover:border-emerald-400 hover:shadow-md transition">
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="p-2 bg-blue-50 text-blue-700 rounded-xl">
-                    <MessageSquareWarning className="w-5 h-5" />
+                    <Package className="w-5 h-5" />
                   </div>
                   <span className="text-[10px] font-black uppercase tracking-wider bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+                    SILOGIS
+                  </span>
+                </div>
+                <div>
+                  <h5 className="font-extrabold text-slate-900 text-sm">Logistik &amp; ATK</h5>
+                  <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                    Total {logistics.length} baris permintaan barang kantor
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleDownloadLogistics}
+                className="mt-4 w-full flex items-center justify-center gap-1.5 px-3.5 py-2 bg-blue-700 hover:bg-blue-600 text-white text-xs font-extrabold rounded-xl transition cursor-pointer active:scale-95 shadow-sm"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Unduh Rekap CSV</span>
+              </button>
+            </div>
+
+            {/* Card 6: Pengaduan Masuk (LAPOR-RT) */}
+            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex flex-col justify-between hover:border-emerald-400 hover:shadow-md transition">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="p-2 bg-rose-50 text-rose-700 rounded-xl">
+                    <MessageSquareWarning className="w-5 h-5" />
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-rose-100 text-rose-800 px-2 py-0.5 rounded">
                     LAPOR-RT
                   </span>
                 </div>
                 <div>
                   <h5 className="font-extrabold text-slate-900 text-sm">Kotak Pengaduan</h5>
                   <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                    Total {complaints.length} baris aduan prasarana
+                    Total {complaints.length} baris aduan prasarana &amp; fasilitas
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={handleDownloadComplaints}
-                className="mt-4 w-full flex items-center justify-center gap-1.5 px-3.5 py-2 bg-blue-700 hover:bg-blue-600 text-white text-xs font-extrabold rounded-xl transition cursor-pointer active:scale-95 shadow-sm"
+                className="mt-4 w-full flex items-center justify-center gap-1.5 px-3.5 py-2 bg-rose-700 hover:bg-rose-600 text-white text-xs font-extrabold rounded-xl transition cursor-pointer active:scale-95 shadow-sm"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Unduh Rekap CSV</span>
@@ -598,17 +764,17 @@ export default function GoogleSheetsPanel({
                 </div>
                 <div className="space-y-1">
                   <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                    Informasi Teknis Mengapa Tombol Gagal Koneksi:
+                    Informasi Integrasi Google Sheets Cloud:
                   </h4>
                   <ul className="text-xs text-slate-600 space-y-1.5 font-medium list-disc pl-4 leading-relaxed">
                     <li>
-                      <strong>Pop-up Iframe Terblokir:</strong> Di pratinjau AI Studio, peramban membatasi jendela pop-up otentikasi Google demi keamanan.
+                      <strong>6 Tab Otomatis:</strong> Saat lembar kerja dibuat, 6 tab (SIPERUM, SIPAKAR, SajiRapat, PetaCendera, SILOGIS, LAPOR-RT) akan dibuat beserta header kolom resminya.
                     </li>
                     <li>
-                      <strong>Google Auth Provider Firebase:</strong> Proyek Firebase memerlukan pengaktifan metode <em>Google Sign-In</em> dan pendaftaran domain di konsol keamanan Firebase Authentication.
+                      <strong>Auto-Sync:</strong> Ketika fitur Auto-Sync aktif, setiap permohonan baru yang disetujui akan langsung tercatat otomatis di Google Sheets.
                     </li>
                     <li>
-                      <strong>Solusi Paling Praktis:</strong> Silakan beralih ke tab <strong>"Ekspor Excel/CSV (Instan)"</strong>. Seluruh data pelayanan dapat langsung diunduh dan dibuka di Google Sheets atau Microsoft Excel secara instan tanpa perlu pengaturan otentikasi rumit.
+                      <strong>Alternatif Instan:</strong> Gunakan tab <strong>"Ekspor Excel/CSV (Instan)"</strong> untuk mengunduh rekap lengkap kapan saja tanpa perlu login Google.
                     </li>
                   </ul>
                 </div>
@@ -636,7 +802,7 @@ export default function GoogleSheetsPanel({
                       className="w-full sm:w-auto self-start px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md flex items-center justify-center gap-2 cursor-pointer transition active:scale-95 disabled:opacity-50"
                     >
                       <Database className="w-4 h-4" />
-                      <span>Buat Spreadsheet Baru di Drive Saya</span>
+                      <span>Buat Spreadsheet Baru di Drive Saya (6 Tab)</span>
                     </button>
                   </div>
 
@@ -650,40 +816,35 @@ export default function GoogleSheetsPanel({
                       </p>
                       <input
                         type="text"
+                        placeholder="Contoh: 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
                         value={inputSpreadsheetId}
                         onChange={(e) => setInputSpreadsheetId(e.target.value)}
-                        placeholder="Contoh: 1a2b3c4d5e..."
-                        className="w-full text-xs font-mono px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-emerald-500 outline-none"
+                        className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-500 font-mono"
                       />
                     </div>
                     <button
                       type="submit"
-                      disabled={isVerifying || isLoading}
-                      className="self-end px-4.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer disabled:opacity-65"
+                      disabled={isVerifying || !inputSpreadsheetId.trim()}
+                      className="self-end px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-extrabold rounded-xl transition cursor-pointer disabled:opacity-50"
                     >
-                      {isVerifying ? (
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <span>Tautkan ID</span>
-                      )}
+                      {isVerifying ? 'Memverifikasi...' : 'Hubungkan Lembar Kerja'}
                     </button>
                   </form>
                 </div>
               ) : (
-                <div className="space-y-6">
-                  
-                  {/* Connected Active Sheet Indicator */}
-                  <div className="bg-emerald-50 border border-emerald-200 p-5 rounded-3xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
-                    <div className="flex items-start gap-3.5">
-                      <div className="p-2.5 bg-emerald-200 text-emerald-800 rounded-xl">
+                <div className="space-y-4">
+                  {/* Linked spreadsheet active badge */}
+                  <div className="p-4 bg-emerald-50/80 border border-emerald-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-emerald-600 text-white rounded-xl shadow-sm">
                         <CheckCircle className="w-5 h-5" />
                       </div>
-                      <div className="space-y-1">
+                      <div className="space-y-0.5">
                         <span className="block text-[9px] font-black text-emerald-700 tracking-wider uppercase leading-none">
                           Database Google Sheets Aktif
                         </span>
                         <p className="text-xs font-extrabold text-slate-800">
-                          ID: <span className="font-mono text-[11px] bg-emerald-100 px-1.5 py-0.5 rounded text-slate-600">{spreadsheetId}</span>
+                          ID: <span className="font-mono text-[11px] bg-emerald-100 px-1.5 py-0.5 rounded text-slate-700">{spreadsheetId}</span>
                         </p>
                         <div className="flex flex-wrap gap-2 pt-1">
                           <a 
@@ -692,14 +853,14 @@ export default function GoogleSheetsPanel({
                             rel="noreferrer"
                             className="inline-flex items-center gap-1.5 text-xs text-emerald-700 hover:text-emerald-900 font-extrabold underline cursor-pointer"
                           >
-                            <span>Buka Spreadsheet Bapak di Tab Baru</span>
+                            <span>Buka Spreadsheet di Tab Baru</span>
                             <ExternalLink className="w-3 h-3" />
                           </a>
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2.5">
                       <button
                         type="button"
                         onClick={() => {
@@ -723,65 +884,123 @@ export default function GoogleSheetsPanel({
 
                       <button
                         type="button"
-                        onClick={handleDisconnectSpreadsheet}
-                        className="px-3.5 py-1.5 font-bold text-xs text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl cursor-pointer transition"
+                        onClick={handleSyncAllDirect}
+                        disabled={isLoading}
+                        className="px-3.5 py-1.5 font-extrabold text-xs text-white bg-emerald-700 hover:bg-emerald-600 rounded-xl cursor-pointer transition shadow-sm disabled:opacity-50 flex items-center gap-1.5"
                       >
-                        Lepas Tautan Sheet
+                        <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+                        <span>Sinkronisasi Semua</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleDisconnectSpreadsheet}
+                        className="px-3 py-1.5 font-bold text-xs text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl cursor-pointer transition"
+                      >
+                        Lepas Tautan
                       </button>
                     </div>
                   </div>
 
-                  {/* Bulk Synchronize Area */}
-                  <div className="space-y-3">
-                    <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider">
-                      Sinkronisasi Massal ke Google Sheets
-                    </h4>
-                    <p className="text-xs text-slate-500 leading-normal font-medium">
-                      Kirim data tersimpan ke lembar kerja yang sedang terhubung:
-                    </p>
+                  {/* Bulk Synchronize Area for all 6 Apps */}
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                        Sinkronisasi Parsial ke Tab Google Sheets
+                      </h4>
+                      <span className="text-[11px] text-slate-500 font-medium">Klik per aplikasi untuk mengirimkan data ke tab terkait</span>
+                    </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                       
+                      {/* SIPERUM */}
                       <button
                         type="button"
                         onClick={handleExportBookings}
                         disabled={isLoading}
-                        className="p-4 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-2xl text-left transition cursor-pointer disabled:opacity-50 space-y-1.5"
+                        className="p-3 bg-slate-50 hover:bg-teal-50 border border-slate-200 hover:border-teal-300 rounded-2xl text-left transition cursor-pointer disabled:opacity-50 space-y-1"
                       >
                         <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-black text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md">Peminjaman Ruang</span>
-                          <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
+                          <span className="text-[9px] font-black text-teal-700 bg-teal-100 px-1.5 py-0.5 rounded">SIPERUM</span>
+                          <RefreshCw className="w-3 h-3 text-slate-400" />
                         </div>
-                        <div className="text-slate-800 font-extrabold text-sm">{bookings.length} baris data</div>
-                        <p className="text-[10px] text-slate-500 leading-tight font-medium">Kirim ke tab "Peminjaman Ruang"</p>
+                        <div className="text-slate-900 font-extrabold text-xs">{bookings.length} baris</div>
+                        <p className="text-[10px] text-slate-500 leading-tight">Ruang Rapat</p>
                       </button>
 
+                      {/* SIPAKAR */}
                       <button
                         type="button"
                         onClick={handleExportVehicles}
                         disabled={isLoading}
-                        className="p-4 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-2xl text-left transition cursor-pointer disabled:opacity-50 space-y-1.5"
+                        className="p-3 bg-slate-50 hover:bg-amber-50 border border-slate-200 hover:border-amber-300 rounded-2xl text-left transition cursor-pointer disabled:opacity-50 space-y-1"
                       >
                         <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-black text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md">Peminjaman Mobil</span>
-                          <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
+                          <span className="text-[9px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">SIPAKAR</span>
+                          <RefreshCw className="w-3 h-3 text-slate-400" />
                         </div>
-                        <div className="text-slate-800 font-extrabold text-sm">{vehicles.length} baris data</div>
-                        <p className="text-[10px] text-slate-500 leading-tight font-medium">Kirim ke tab "Peminjaman Kendaraan"</p>
+                        <div className="text-slate-900 font-extrabold text-xs">{vehicles.length} baris</div>
+                        <p className="text-[10px] text-slate-500 leading-tight">Kendaraan Dinas</p>
                       </button>
 
+                      {/* SajiRapat */}
+                      <button
+                        type="button"
+                        onClick={handleExportSajiRapat}
+                        disabled={isLoading}
+                        className="p-3 bg-slate-50 hover:bg-orange-50 border border-slate-200 hover:border-orange-300 rounded-2xl text-left transition cursor-pointer disabled:opacity-50 space-y-1"
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className="text-[9px] font-black text-orange-700 bg-orange-100 px-1.5 py-0.5 rounded">SajiRapat</span>
+                          <RefreshCw className="w-3 h-3 text-slate-400" />
+                        </div>
+                        <div className="text-slate-900 font-extrabold text-xs">{sajiRapat.length} baris</div>
+                        <p className="text-[10px] text-slate-500 leading-tight">Konsumsi Rapat</p>
+                      </button>
+
+                      {/* PETACENDERA */}
+                      <button
+                        type="button"
+                        onClick={handleExportCinderamata}
+                        disabled={isLoading}
+                        className="p-3 bg-slate-50 hover:bg-purple-50 border border-slate-200 hover:border-purple-300 rounded-2xl text-left transition cursor-pointer disabled:opacity-50 space-y-1"
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className="text-[9px] font-black text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded">PETACENDERA</span>
+                          <RefreshCw className="w-3 h-3 text-slate-400" />
+                        </div>
+                        <div className="text-slate-900 font-extrabold text-xs">{cinderamata.length} baris</div>
+                        <p className="text-[10px] text-slate-500 leading-tight">Cinderamata</p>
+                      </button>
+
+                      {/* SILOGIS */}
                       <button
                         type="button"
                         onClick={handleExportLogistics}
                         disabled={isLoading}
-                        className="p-4 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-2xl text-left transition cursor-pointer disabled:opacity-50 space-y-1.5"
+                        className="p-3 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded-2xl text-left transition cursor-pointer disabled:opacity-50 space-y-1"
                       >
                         <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-black text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md">Logistik &amp; ATK</span>
-                          <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
+                          <span className="text-[9px] font-black text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">SILOGIS</span>
+                          <RefreshCw className="w-3 h-3 text-slate-400" />
                         </div>
-                        <div className="text-slate-800 font-extrabold text-sm">{logistics.length} baris data</div>
-                        <p className="text-[10px] text-slate-500 leading-tight font-medium">Kirim ke tab "Permintaan Logistik"</p>
+                        <div className="text-slate-900 font-extrabold text-xs">{logistics.length} baris</div>
+                        <p className="text-[10px] text-slate-500 leading-tight">Logistik &amp; ATK</p>
+                      </button>
+
+                      {/* LAPOR-RT */}
+                      <button
+                        type="button"
+                        onClick={handleExportComplaints}
+                        disabled={isLoading}
+                        className="p-3 bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-300 rounded-2xl text-left transition cursor-pointer disabled:opacity-50 space-y-1"
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className="text-[9px] font-black text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded">LAPOR-RT</span>
+                          <RefreshCw className="w-3 h-3 text-slate-400" />
+                        </div>
+                        <div className="text-slate-900 font-extrabold text-xs">{complaints.length} baris</div>
+                        <p className="text-[10px] text-slate-500 leading-tight">Pengaduan</p>
                       </button>
 
                     </div>
