@@ -546,7 +546,7 @@ export default function GedungSchedule({
               </div>
               <h3 className="text-lg sm:text-xl font-extrabold text-white flex items-center gap-2 font-display">
                 <Sparkles className="w-5 h-5 text-amber-400" />
-                Jadwal Kegiatan Tahunan (Pasti Terlaksana)
+                Jadwal Kegiatan Tahunan
               </h3>
             </div>
             <p className="text-xs text-slate-400 max-w-sm">
