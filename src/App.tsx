@@ -968,67 +968,75 @@ export default function App() {
       </footer>
 
       {/* 4.5. LANDING PAGE CONTENT CUSTOMIZER MODAL */}
-      <LandingEditModal
-        isOpen={isLandingEditOpen}
-        onClose={() => setIsLandingEditOpen(false)}
-        content={landingContent}
-        defaultTab={landingEditTab}
-        onSave={async (newContent) => {
-          try {
-            await setDoc(doc(db, 'settings', 'landing'), newContent);
-            setLandingContent(newContent);
-            triggerToast('Susunan konten halaman utama berhasil diperbarui!', 'success');
-          } catch (err) {
-            handleFirestoreError(err, OperationType.WRITE, 'settings/landing');
-          }
-        }}
-      />
+      {isLandingEditOpen && (
+        <LandingEditModal
+          isOpen={isLandingEditOpen}
+          onClose={() => setIsLandingEditOpen(false)}
+          content={landingContent}
+          defaultTab={landingEditTab}
+          onSave={async (newContent) => {
+            try {
+              await setDoc(doc(db, 'settings', 'landing'), newContent);
+              setLandingContent(newContent);
+              triggerToast('Susunan konten halaman utama berhasil diperbarui!', 'success');
+            } catch (err) {
+              handleFirestoreError(err, OperationType.WRITE, 'settings/landing');
+            }
+          }}
+        />
+      )}
 
       {/* 4.6. COMPLAINTS & LAPOR-RT MANAGEMENT MODAL */}
-      <ComplaintsModal
-        isOpen={isComplaintsModalOpen}
-        onClose={() => setIsComplaintsModalOpen(false)}
-        complaints={complaints}
-        onUpdateStatus={handleUpdateComplaintStatus}
-        onDeleteComplaint={handleDeleteComplaint}
-        showToast={triggerToast}
-      />
+      {isComplaintsModalOpen && (
+        <ComplaintsModal
+          isOpen={isComplaintsModalOpen}
+          onClose={() => setIsComplaintsModalOpen(false)}
+          complaints={complaints}
+          onUpdateStatus={handleUpdateComplaintStatus}
+          onDeleteComplaint={handleDeleteComplaint}
+          showToast={triggerToast}
+        />
+      )}
 
       {/* 4.7. UNIFIED ALL-APPLICATION ACTIONABLE REPORTS MODAL (SIPERUM, SIPAKAR, SILOGIS, LAPOR-RT) */}
-      <ServiceReportsModal
-        isOpen={isServiceReportsModalOpen}
-        onClose={() => setIsServiceReportsModalOpen(false)}
-        initialAppFilter={serviceReportsInitialFilter}
-        isAdminActive={isAdminActive}
-        bookings={bookings}
-        vehicles={vehicles}
-        logistics={logistics}
-        sajiRapat={sajiRapat}
-        cinderamata={cinderamata}
-        complaints={complaints}
-        onUpdateBookingStatus={handleUpdateBookingStatus}
-        onDeleteBooking={handleDeleteBooking}
-        onUpdateVehicleStatus={handleUpdateVehicleStatus}
-        onDeleteVehicle={handleDeleteVehicle}
-        onUpdateLogisticsStatus={handleUpdateLogisticsStatus}
-        onDeleteLogistics={handleDeleteLogistics}
-        onUpdateSajiRapatStatus={handleUpdateSajiRapatStatus}
-        onDeleteSajiRapat={handleDeleteSajiRapat}
-        onUpdateCinderamataStatus={handleUpdateCinderamataStatus}
-        onDeleteCinderamata={handleDeleteCinderamata}
-        onUpdateComplaintStatus={handleUpdateComplaintStatus}
-        onDeleteComplaint={handleDeleteComplaint}
-        onClearAllDummyData={handleClearAllDummyData}
-        showToast={triggerToast}
-      />
+      {isServiceReportsModalOpen && (
+        <ServiceReportsModal
+          isOpen={isServiceReportsModalOpen}
+          onClose={() => setIsServiceReportsModalOpen(false)}
+          initialAppFilter={serviceReportsInitialFilter}
+          isAdminActive={isAdminActive}
+          bookings={bookings}
+          vehicles={vehicles}
+          logistics={logistics}
+          sajiRapat={sajiRapat}
+          cinderamata={cinderamata}
+          complaints={complaints}
+          onUpdateBookingStatus={handleUpdateBookingStatus}
+          onDeleteBooking={handleDeleteBooking}
+          onUpdateVehicleStatus={handleUpdateVehicleStatus}
+          onDeleteVehicle={handleDeleteVehicle}
+          onUpdateLogisticsStatus={handleUpdateLogisticsStatus}
+          onDeleteLogistics={handleDeleteLogistics}
+          onUpdateSajiRapatStatus={handleUpdateSajiRapatStatus}
+          onDeleteSajiRapat={handleDeleteSajiRapat}
+          onUpdateCinderamataStatus={handleUpdateCinderamataStatus}
+          onDeleteCinderamata={handleDeleteCinderamata}
+          onUpdateComplaintStatus={handleUpdateComplaintStatus}
+          onDeleteComplaint={handleDeleteComplaint}
+          onClearAllDummyData={handleClearAllDummyData}
+          showToast={triggerToast}
+        />
+      )}
 
       {/* 5. PORTAL AUTH MODAL */}
-      <AdminLoginModal 
-        isOpen={isAdminLoginOpen}
-        onClose={() => setIsAdminLoginOpen(false)}
-        onLoginSuccess={() => setIsAdminActive(true)}
-        showToast={triggerToast}
-      />
+      {isAdminLoginOpen && (
+        <AdminLoginModal 
+          isOpen={isAdminLoginOpen}
+          onClose={() => setIsAdminLoginOpen(false)}
+          onLoginSuccess={() => setIsAdminActive(true)}
+          showToast={triggerToast}
+        />
+      )}
 
       {/* 6. TOAST NOTIFIER FLOATER */}
       <Toast 

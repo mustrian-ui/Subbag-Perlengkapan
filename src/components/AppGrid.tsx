@@ -506,38 +506,40 @@ export default function AppGrid({
       {/* ======================================================== */}
       {/* 2. INTERACTIVE MODAL FOR MICRO-APPLICATIONS PORTAL */}
       {/* ======================================================== */}
-      <ServicePortalModal
-        activeMicroApp={activeMicroApp}
-        onClose={() => setActiveMicroApp(null)}
-        isAdminActive={isAdminActive}
-        onOpenServiceReportsModal={onOpenServiceReportsModal}
-        onOpenComplaintsModal={onOpenComplaintsModal}
-        bookings={bookings}
-        onAddBooking={onAddBooking}
-        onUpdateBookingStatus={onUpdateBookingStatus}
-        onDeleteBooking={onDeleteBooking}
-        vehicles={vehicles}
-        onAddVehicle={onAddVehicle}
-        onUpdateVehicleStatus={onUpdateVehicleStatus}
-        onDeleteVehicle={onDeleteVehicle}
-        logistics={logistics}
-        onAddLogistics={onAddLogistics}
-        onUpdateLogisticsStatus={onUpdateLogisticsStatus}
-        onDeleteLogistics={onDeleteLogistics}
-        sajiRapat={sajiRapat}
-        onAddSajiRapat={onAddSajiRapat}
-        onUpdateSajiRapatStatus={onUpdateSajiRapatStatus}
-        onDeleteSajiRapat={onDeleteSajiRapat}
-        cinderamata={cinderamata}
-        onAddCinderamata={onAddCinderamata}
-        onUpdateCinderamataStatus={onUpdateCinderamataStatus}
-        onDeleteCinderamata={onDeleteCinderamata}
-        complaints={complaints}
-        onAddComplaint={onAddComplaint}
-        onUpdateComplaintStatus={onUpdateComplaintStatus}
-        onDeleteComplaint={onDeleteComplaint}
-        showToast={showToast}
-      />
+      {activeMicroApp && (
+        <ServicePortalModal
+          activeMicroApp={activeMicroApp}
+          onClose={() => setActiveMicroApp(null)}
+          isAdminActive={isAdminActive}
+          onOpenServiceReportsModal={onOpenServiceReportsModal}
+          onOpenComplaintsModal={onOpenComplaintsModal}
+          bookings={bookings}
+          onAddBooking={onAddBooking}
+          onUpdateBookingStatus={onUpdateBookingStatus}
+          onDeleteBooking={onDeleteBooking}
+          vehicles={vehicles}
+          onAddVehicle={onAddVehicle}
+          onUpdateVehicleStatus={onUpdateVehicleStatus}
+          onDeleteVehicle={onDeleteVehicle}
+          logistics={logistics}
+          onAddLogistics={onAddLogistics}
+          onUpdateLogisticsStatus={onUpdateLogisticsStatus}
+          onDeleteLogistics={onDeleteLogistics}
+          sajiRapat={sajiRapat}
+          onAddSajiRapat={onAddSajiRapat}
+          onUpdateSajiRapatStatus={onUpdateSajiRapatStatus}
+          onDeleteSajiRapat={onDeleteSajiRapat}
+          cinderamata={cinderamata}
+          onAddCinderamata={onAddCinderamata}
+          onUpdateCinderamataStatus={onUpdateCinderamataStatus}
+          onDeleteCinderamata={onDeleteCinderamata}
+          complaints={complaints}
+          onAddComplaint={onAddComplaint}
+          onUpdateComplaintStatus={onUpdateComplaintStatus}
+          onDeleteComplaint={onDeleteComplaint}
+          showToast={showToast}
+        />
+      )}
 
     </section>
   );

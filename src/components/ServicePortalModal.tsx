@@ -211,9 +211,7 @@ export default function ServicePortalModal({
   onDeleteComplaint,
   showToast
 }: ServicePortalModalProps) {
-  if (!activeMicroApp) return null;
-
-  const [activeServiceType, setActiveServiceType] = useState<AppFilterType>(() => getServiceType(activeMicroApp));
+  const [activeServiceType, setActiveServiceType] = useState<AppFilterType>(() => activeMicroApp ? getServiceType(activeMicroApp) : 'siperum');
 
   useEffect(() => {
     if (activeMicroApp) {
@@ -768,6 +766,8 @@ export default function ServicePortalModal({
         };
     }
   };
+
+  if (!activeMicroApp) return null;
 
   const activeServiceInfo = getActiveServiceInfo();
 
