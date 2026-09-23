@@ -199,25 +199,22 @@ export default function App() {
       if (!snap.empty) {
         const list: Application[] = [];
         snap.forEach(d => list.push(d.data() as Application));
-        // Auto-merge default apps if not yet present in firestore
-        DEFAULT_APPS.forEach(defApp => {
-          if (!list.some(a => a.id === defApp.id || a.title.toLowerCase().includes(defApp.title.toLowerCase().split(' ')[0]))) {
-            list.push(defApp);
-            if (auth.currentUser) {
-              setDoc(doc(db, 'applications', defApp.id), defApp).catch(() => {});
-            }
-          }
-        });
         list.sort((a, b) => a.id.localeCompare(b.id));
         setApplications(list);
       } else {
-        setApplications(DEFAULT_APPS);
-        if (auth.currentUser) {
-          DEFAULT_APPS.forEach(app => {
-            setDoc(doc(db, 'applications', app.id), app).catch(err => {
-              console.warn('Failed to seed application:', app.id, err);
+        const isSeeded = localStorage.getItem('setda_apps_seeded');
+        if (!isSeeded) {
+          localStorage.setItem('setda_apps_seeded', 'true');
+          setApplications(DEFAULT_APPS);
+          if (auth.currentUser) {
+            DEFAULT_APPS.forEach(app => {
+              setDoc(doc(db, 'applications', app.id), app).catch(err => {
+                console.warn('Failed to seed application:', app.id, err);
+              });
             });
-          });
+          }
+        } else {
+          setApplications([]);
         }
       }
     }, (err) => {
@@ -233,50 +230,56 @@ export default function App() {
         list.sort((a, b) => b.date.localeCompare(a.date));
         setGalleryItems(list);
       } else {
-        const DEFAULT_GALLERY: GalleryItem[] = [
-          {
-            id: 'gal_1',
-            title: 'Rapat Koordinasi Optimalisasi Pengelolaan Aset Daerah',
-            category: 'Koordinasi',
-            date: '2026-05-15',
-            url: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=800'
-          },
-          {
-            id: 'gal_2',
-            title: 'Pemeliharaan Rutin Pendingin Ruangan (AC) Aula Serbaguna',
-            category: 'Pemeliharaan',
-            date: '2026-05-18',
-            url: 'https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&q=80&w=800'
-          },
-          {
-            id: 'gal_3',
-            title: 'Pendistribusian Logistik & Paket ATK Bulanan ke Bagian Organisasi',
-            category: 'Logistik',
-            date: '2026-05-20',
-            url: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=800'
-          },
-          {
-            id: 'gal_4',
-            title: 'Sinergitas Keprotokolan Kunjungan Kerja Delegasi Pemerintah Pusat',
-            category: 'Keprotokolan',
-            date: '2026-05-22',
-            url: 'https://images.unsplash.com/photo-1431540015161-0bf868a2d407?auto=format&fit=crop&q=80&w=800'
-          }
-        ];
-        setGalleryItems(DEFAULT_GALLERY);
-        if (auth.currentUser) {
-          DEFAULT_GALLERY.forEach(item => {
-            setDoc(doc(db, 'gallery', item.id), item).catch(err => {
-              console.warn('Failed to seed gallery:', item.id, err);
+        const isSeeded = localStorage.getItem('setda_gallery_seeded');
+        if (!isSeeded) {
+          const DEFAULT_GALLERY: GalleryItem[] = [
+            {
+              id: 'gal_1',
+              title: 'Rapat Koordinasi Optimalisasi Pengelolaan Aset Daerah',
+              category: 'Koordinasi',
+              date: '2026-05-15',
+              url: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=800'
+            },
+            {
+              id: 'gal_2',
+              title: 'Pemeliharaan Rutin Pendingin Ruangan (AC) Aula Serbaguna',
+              category: 'Pemeliharaan',
+              date: '2026-05-18',
+              url: 'https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&q=80&w=800'
+            },
+            {
+              id: 'gal_3',
+              title: 'Pendistribusian Logistik & Paket ATK Bulanan ke Bagian Organisasi',
+              category: 'Logistik',
+              date: '2026-05-20',
+              url: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=800'
+            },
+            {
+              id: 'gal_4',
+              title: 'Sinergitas Keprotokolan Kunjungan Kerja Delegasi Pemerintah Pusat',
+              category: 'Keprotokolan',
+              date: '2026-05-22',
+              url: 'https://images.unsplash.com/photo-1431540015161-0bf868a2d407?auto=format&fit=crop&q=80&w=800'
+            }
+          ];
+          localStorage.setItem('setda_gallery_seeded', 'true');
+          setGalleryItems(DEFAULT_GALLERY);
+          if (auth.currentUser) {
+            DEFAULT_GALLERY.forEach(item => {
+              setDoc(doc(db, 'gallery', item.id), item).catch(err => {
+                console.warn('Failed to seed gallery:', item.id, err);
+              });
             });
-          });
+          }
+        } else {
+          setGalleryItems([]);
         }
       }
     }, (err) => {
       console.warn('Firestore gallery listen error:', err);
     });
 
-    // 4. Bookings sync
+    // 4. Bookings sync (SIPERUM) - No auto-reseed on deletion
     const bookingsRef = collection(db, 'bookings');
     const unsubBookings = onSnapshot(bookingsRef, (snap) => {
       if (!snap.empty) {
@@ -285,42 +288,13 @@ export default function App() {
         list.sort((a, b) => b.id.localeCompare(a.id));
         setBookings(list);
       } else {
-        const DEFAULT_BOOKINGS: Booking[] = [
-          { 
-            id: 'book_1', 
-            ruang: 'Gedung Lubung', 
-            tanggal: '2026-05-25', 
-            waktu: '09:00 - 12:00 WITA', 
-            agenda: 'Bagian Tata Pemerintahan - Rapat RKPD Dinas Kaltara', 
-            status: 'Disetujui',
-            pemohon: 'Drs. Heri Supriyadi',
-            instansi: 'Bagian Tata Pemerintahan'
-          },
-          { 
-            id: 'book_2', 
-            ruang: 'Gedung Serbaguna', 
-            tanggal: '2026-05-26', 
-            waktu: '13:00 - 16:00 WITA', 
-            agenda: 'Subbag Protokol - Sosialisasi Digitalisasi Birokrasi', 
-            status: 'Menunggu Konfirmasi',
-            pemohon: 'Staff Protokol',
-            instansi: 'Subbag Protokol Setda'
-          }
-        ];
-        setBookings(DEFAULT_BOOKINGS);
-        if (auth.currentUser) {
-          DEFAULT_BOOKINGS.forEach(b => {
-            setDoc(doc(db, 'bookings', b.id), b).catch(err => {
-              console.warn('Failed to seed booking:', b.id, err);
-            });
-          });
-        }
+        setBookings([]);
       }
     }, (err) => {
       console.warn('Firestore bookings listen error:', err);
     });
 
-    // 5. Vehicles sync
+    // 5. Vehicles sync (SIPAKAR) - No auto-reseed on deletion
     const vehiclesRef = collection(db, 'vehicles');
     const unsubVehicles = onSnapshot(vehiclesRef, (snap) => {
       if (!snap.empty) {
@@ -329,30 +303,13 @@ export default function App() {
         list.sort((a, b) => b.id.localeCompare(a.id));
         setVehicles(list);
       } else {
-        const DEFAULT_VEHICLES: Vehicle[] = [
-          { 
-            id: 'veh_1', 
-            kendaraan: 'Toyota Innova (KU 1045 A)', 
-            pemohon: 'Drs. Heri Supriyadi', 
-            instansi: 'Bagian Organisasi Setda',
-            tujuan: 'Bandara Juwata (Penjemputan DPR RI)', 
-            status: 'Disetujui' 
-          }
-        ];
-        setVehicles(DEFAULT_VEHICLES);
-        if (auth.currentUser) {
-          DEFAULT_VEHICLES.forEach(v => {
-            setDoc(doc(db, 'vehicles', v.id), v).catch(err => {
-              console.warn('Failed to seed vehicle:', v.id, err);
-            });
-          });
-        }
+        setVehicles([]);
       }
     }, (err) => {
       console.warn('Firestore vehicles listen error:', err);
     });
 
-    // 6. Logistics sync
+    // 6. Logistics sync (SILOGIS) - No auto-reseed on deletion
     const logisticsRef = collection(db, 'logistics');
     const unsubLogistics = onSnapshot(logisticsRef, (snap) => {
       if (!snap.empty) {
@@ -361,40 +318,13 @@ export default function App() {
         list.sort((a, b) => b.id.localeCompare(a.id));
         setLogistics(list);
       } else {
-        const DEFAULT_LOGISTICS: LogisticsRequest[] = [
-          { 
-            id: 'log_1', 
-            barang: 'Kertas HVS A4 80g', 
-            jumlah: '5 Rim', 
-            status: 'Selesai',
-            kegiatan: 'Administrasi Umum',
-            pemohon: 'Staff Hukum',
-            instansi: 'Bagian Hukum Setda'
-          },
-          { 
-            id: 'log_2', 
-            barang: 'Toner Ink HP Deskjet', 
-            jumlah: '2 Box', 
-            status: 'Diproses',
-            kegiatan: 'Cetak Dokumen Laporan',
-            pemohon: 'Staff Kesra',
-            instansi: 'Bagian Kesejahteraan Rakyat Setda'
-          }
-        ];
-        setLogistics(DEFAULT_LOGISTICS);
-        if (auth.currentUser) {
-          DEFAULT_LOGISTICS.forEach(l => {
-            setDoc(doc(db, 'logistics', l.id), l).catch(err => {
-              console.warn('Failed to seed logistics:', l.id, err);
-            });
-          });
-        }
+        setLogistics([]);
       }
     }, (err) => {
       console.warn('Firestore logistics listen error:', err);
     });
 
-    // 7. Schedules sync
+    // 7. Schedules sync (GSG) - No auto-reseed on deletion
     const schedulesRef = collection(db, 'schedules');
     const unsubSchedules = onSnapshot(schedulesRef, (snap) => {
       if (!snap.empty) {
@@ -403,48 +333,13 @@ export default function App() {
         list.sort((a, b) => a.hariTanggal.localeCompare(b.hariTanggal));
         setSchedules(list);
       } else {
-        const DEFAULT_SCHEDULES: HallSchedule[] = [
-          {
-            id: 'sched_1',
-            hariTanggal: 'Senin, 15 Juni 2026',
-            kegiatan: 'Rapat Rencana Kerja Anggaran APBD-Perubahan 2026',
-            instansi: 'Bappeda Litbang Kota Tarakan',
-            keterangan: 'Lengkap'
-          },
-          {
-            id: 'sched_2',
-            hariTanggal: 'Selasa, 16 Juni 2026',
-            kegiatan: 'Pembekalan Teknis Aplikasi SIPERUM & SIPAKAR Internal Setda',
-            instansi: 'Subbag Rumah Tangga & Perlengkapan',
-            keterangan: 'Lengkap'
-          },
-          {
-            id: 'sched_3',
-            hariTanggal: 'Rabu, 17 Juni 2026',
-            kegiatan: 'Audiensi Pemangku Kepentingan Pariwisata Bersama Walikota Tarakan',
-            instansi: 'Bagian Protokol dan Komunikasi Pimpinan',
-            keterangan: 'Lengkap'
-          },
-          {
-            id: 'sched_4',
-            hariTanggal: 'Jumat, 19 Juni 2026',
-            kegiatan: 'Bimbingan Teknis Penginputan e-Monev Kota Tarakan',
-            instansi: 'Bagian Organisasi Setda',
-            keterangan: 'Tunda / Reschedule'
-          }
-        ];
-        setSchedules(DEFAULT_SCHEDULES);
-        DEFAULT_SCHEDULES.forEach(s => {
-          setDoc(doc(db, 'schedules', s.id), s).catch(err => {
-            console.warn('Failed to seed schedule:', s.id, err);
-          });
-        });
+        setSchedules([]);
       }
     }, (err) => {
       console.warn('Firestore schedules listen error:', err);
     });
 
-    // 8. Complaints (LAPOR-RT) sync
+    // 8. Complaints (LAPOR-RT) sync - No auto-reseed on deletion
     const complaintsRef = collection(db, 'complaints');
     const unsubComplaints = onSnapshot(complaintsRef, (snap) => {
       if (!snap.empty) {
@@ -453,42 +348,13 @@ export default function App() {
         list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
         setComplaints(list);
       } else {
-        const DEFAULT_COMPLAINTS: Complaint[] = [
-          {
-            id: 'comp_demo_1',
-            name: 'Budi Santoso, S.STP',
-            nip: '19850314 200801 1 003',
-            bagian: 'Bagian Organisasi & Tata Laksana',
-            type: 'Kerusakan Fasilitas',
-            location: 'Lantai 2 Koridor Timur Ruang Arsip',
-            message: 'Unit AC ruangan mengalami kebocoran pipa kondensasi dan pendingin tidak bekerja optimal sejak kemarin sore.',
-            status: 'Diproses',
-            createdAt: new Date(Date.now() - 3600000 * 24).toISOString()
-          },
-          {
-            id: 'comp_demo_2',
-            name: 'Siti Rahmawati, A.Md',
-            nip: '19920821 201503 2 005',
-            bagian: 'Subbag Protokol & Komunikasi Pimpinan',
-            type: 'Pelayanan Kebersihan',
-            location: 'Toilet Pegawai Sayap Barat Gedung Utama',
-            message: 'Kran wastafel tersumbat dan persediaan sabun cuci tangan habis pasca kegiatan rapat koordinasi forkopimda.',
-            status: 'Masuk',
-            createdAt: new Date(Date.now() - 3600000 * 2).toISOString()
-          }
-        ];
-        setComplaints(DEFAULT_COMPLAINTS);
-        DEFAULT_COMPLAINTS.forEach(c => {
-          setDoc(doc(db, 'complaints', c.id), c).catch(err => {
-            console.warn('Failed to seed complaint:', c.id, err);
-          });
-        });
+        setComplaints([]);
       }
     }, (err) => {
       console.warn('Firestore complaints listen error:', err);
     });
 
-    // 9. SajiRapat (Konsumsi Rapat) sync
+    // 9. SajiRapat (Konsumsi Rapat) sync - No auto-reseed on deletion
     const sajiRef = collection(db, 'sajirapat');
     const unsubSajiRapat = onSnapshot(sajiRef, (snap) => {
       if (!snap.empty) {
@@ -497,52 +363,13 @@ export default function App() {
         list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
         setSajiRapat(list);
       } else {
-        const DEFAULT_SAJIRAPAT: SajiRapatRequest[] = [
-          {
-            id: 'saji_1',
-            acara: 'Rapat Koordinasi Pengendalian Inflasi Daerah Kota Tarakan',
-            tanggal: '2026-06-22',
-            waktu: '09:00 - 12:00 WITA',
-            lokasi: 'Ruang Rapat Imbaya Lt. 2',
-            jenisKonsumsi: 'Prasmanan & Snack',
-            porsi: 45,
-            pemohon: 'Drs. H. Hendra M., M.Si',
-            nip: '197508122001121004',
-            instansi: 'Bagian Perekonomian & SDA Setda',
-            kontak: '0812-5432-1100',
-            catatan: 'Disiapkan coffee break pagi dan makan siang prasmanan',
-            status: 'Disetujui',
-            createdAt: new Date().toISOString()
-          },
-          {
-            id: 'saji_2',
-            acara: 'Sosialisasi Reformasi Birokrasi dan Pelayanan Publik Setda',
-            tanggal: '2026-06-25',
-            waktu: '13:30 - 16:30 WITA',
-            lokasi: 'Ruang Rapat Datu Adil Lt. 1',
-            jenisKonsumsi: 'Snack Box Saja',
-            porsi: 60,
-            pemohon: 'Siti Aminah, S.STP',
-            nip: '198803152010012003',
-            instansi: 'Bagian Organisasi Setda',
-            kontak: '0852-4411-9876',
-            catatan: 'Kue basah tradisional khas Tarakan',
-            status: 'Menunggu',
-            createdAt: new Date().toISOString()
-          }
-        ];
-        setSajiRapat(DEFAULT_SAJIRAPAT);
-        if (auth.currentUser) {
-          DEFAULT_SAJIRAPAT.forEach(s => {
-            setDoc(doc(db, 'sajirapat', s.id), s).catch(() => {});
-          });
-        }
+        setSajiRapat([]);
       }
     }, (err) => {
       console.warn('Firestore sajiRapat listen error:', err);
     });
 
-    // 10. Cinderamata (PetaCendera) sync
+    // 10. Cinderamata (PetaCendera) sync - No auto-reseed on deletion
     const cenderaRef = collection(db, 'cinderamata');
     const unsubCinderamata = onSnapshot(cenderaRef, (snap) => {
       if (!snap.empty) {
@@ -551,40 +378,7 @@ export default function App() {
         list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
         setCinderamata(list);
       } else {
-        const DEFAULT_CINDERAMATA: CinderamataRequest[] = [
-          {
-            id: 'cend_1',
-            jenisCinderamata: 'Plakat Kristal Kayu Khas Tarakan',
-            jumlah: 2,
-            keperluan: 'Kunjungan Kerja Tim Verifikasi Kemenpan-RB',
-            penerima: 'Deputi Bidang Pelayanan Publik Kemenpan-RB',
-            tanggalPerlu: '2026-06-24',
-            pemohon: 'Rian Pratama, S.IP',
-            nip: '199204102014021002',
-            instansi: 'Bagian Protokol & Komunikasi Pimpinan',
-            kontak: '0813-8877-2233',
-            status: 'Disetujui',
-            createdAt: new Date().toISOString()
-          },
-          {
-            id: 'cend_2',
-            jenisCinderamata: 'Kain Batik Khas Tarakan & Plakat Akrilik',
-            jumlah: 1,
-            keperluan: 'Pemberian Kenang-kenangan Tamu Studi Tiru Pemkab Berau',
-            penerima: 'Sekretaris Daerah Kabupaten Berau',
-            tanggalPerlu: '2026-06-28',
-            pemohon: 'M. Yusuf, SE',
-            instansi: 'Bagian Pemerintahan Setda',
-            status: 'Menunggu',
-            createdAt: new Date().toISOString()
-          }
-        ];
-        setCinderamata(DEFAULT_CINDERAMATA);
-        if (auth.currentUser) {
-          DEFAULT_CINDERAMATA.forEach(c => {
-            setDoc(doc(db, 'cinderamata', c.id), c).catch(() => {});
-          });
-        }
+        setCinderamata([]);
       }
     }, (err) => {
       console.warn('Firestore cinderamata listen error:', err);
@@ -895,6 +689,48 @@ export default function App() {
     }
   };
 
+  // Dedicated one-click cleanup for all built-in dummy/sample data
+  const handleClearAllDummyData = async () => {
+    const dummyDocs: { col: string; id: string }[] = [
+      { col: 'bookings', id: 'book_1' },
+      { col: 'bookings', id: 'book_2' },
+      { col: 'vehicles', id: 'veh_1' },
+      { col: 'logistics', id: 'log_1' },
+      { col: 'logistics', id: 'log_2' },
+      { col: 'sajirapat', id: 'saji_1' },
+      { col: 'sajirapat', id: 'saji_2' },
+      { col: 'cinderamata', id: 'cend_1' },
+      { col: 'cinderamata', id: 'cend_2' },
+      { col: 'complaints', id: 'comp_demo_1' },
+      { col: 'complaints', id: 'comp_demo_2' },
+      { col: 'schedules', id: 'sched_1' },
+      { col: 'schedules', id: 'sched_2' },
+      { col: 'schedules', id: 'sched_3' },
+      { col: 'schedules', id: 'sched_4' }
+    ];
+
+    try {
+      await Promise.all(
+        dummyDocs.map(d => deleteDoc(doc(db, d.col, d.id)).catch(() => {}))
+      );
+
+      // Instantly clear from local state so UI updates immediately
+      setBookings(prev => prev.filter(b => !['book_1', 'book_2'].includes(b.id)));
+      setVehicles(prev => prev.filter(v => v.id !== 'veh_1'));
+      setLogistics(prev => prev.filter(l => !['log_1', 'log_2'].includes(l.id)));
+      setSajiRapat(prev => prev.filter(s => !['saji_1', 'saji_2'].includes(s.id)));
+      setCinderamata(prev => prev.filter(c => !['cend_1', 'cend_2'].includes(c.id)));
+      setComplaints(prev => prev.filter(c => !['comp_demo_1', 'comp_demo_2'].includes(c.id)));
+      setSchedules(prev => prev.filter(s => !['sched_1', 'sched_2', 'sched_3', 'sched_4'].includes(s.id)));
+
+      localStorage.setItem('setda_dummy_purged', 'true');
+      triggerToast('Semua data contoh (dummy) berhasil dihapus permanen!', 'success');
+    } catch (err) {
+      console.error('Failed to clear dummy data:', err);
+      triggerToast('Gagal menghapus beberapa data dummy.', 'error');
+    }
+  };
+
   const handleScrollToSection = (sectionId: string) => {
     const elem = document.getElementById(sectionId);
     if (elem) {
@@ -930,6 +766,7 @@ export default function App() {
           setServiceReportsInitialFilter('all');
           setIsServiceReportsModalOpen(true);
         }}
+        onClearDummyData={handleClearAllDummyData}
         onLogout={async () => {
           try {
             localStorage.removeItem('admin_bypass_active');
@@ -1181,6 +1018,7 @@ export default function App() {
         onDeleteCinderamata={handleDeleteCinderamata}
         onUpdateComplaintStatus={handleUpdateComplaintStatus}
         onDeleteComplaint={handleDeleteComplaint}
+        onClearAllDummyData={handleClearAllDummyData}
         showToast={triggerToast}
       />
 

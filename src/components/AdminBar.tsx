@@ -1,4 +1,4 @@
-import { Settings, LogOut, MessageSquareText, Layers, AlertCircle } from 'lucide-react';
+import { Settings, LogOut, MessageSquareText, Layers, Trash2 } from 'lucide-react';
 
 interface AdminBarProps {
   isActive: boolean;
@@ -8,6 +8,7 @@ interface AdminBarProps {
   onOpenComplaints?: () => void;
   totalPendingReportsCount?: number;
   onOpenServiceReports?: () => void;
+  onClearDummyData?: () => void;
 }
 
 export default function AdminBar({ 
@@ -17,7 +18,8 @@ export default function AdminBar({
   newComplaintsCount = 0,
   onOpenComplaints,
   totalPendingReportsCount = 0,
-  onOpenServiceReports
+  onOpenServiceReports,
+  onClearDummyData
 }: AdminBarProps) {
   if (!isActive) return null;
 
@@ -71,6 +73,18 @@ export default function AdminBar({
                 {complaintsCount}
               </span>
             )}
+          </button>
+        )}
+
+        {onClearDummyData && (
+          <button
+            type="button"
+            onClick={onClearDummyData}
+            className="normal-case flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-700/80 hover:bg-rose-700 text-white font-bold transition cursor-pointer border border-rose-400/40"
+            title="Hapus semua data contoh / dummy yang ada di database"
+          >
+            <Trash2 className="w-3 h-3" />
+            <span>Bersihkan Data Dummy</span>
           </button>
         )}
 

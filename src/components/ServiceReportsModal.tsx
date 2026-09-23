@@ -51,6 +51,7 @@ interface ServiceReportsModalProps {
   onDeleteCinderamata?: (id: string) => Promise<void>;
   onUpdateComplaintStatus: (id: string, status: 'Masuk' | 'Diproses' | 'Selesai') => Promise<void>;
   onDeleteComplaint: (id: string) => Promise<void>;
+  onClearAllDummyData?: () => Promise<void>;
   showToast: (msg: string, type: 'success' | 'error' | 'info') => void;
 }
 
@@ -96,6 +97,7 @@ export default function ServiceReportsModal({
   onDeleteCinderamata,
   onUpdateComplaintStatus,
   onDeleteComplaint,
+  onClearAllDummyData,
   showToast
 }: ServiceReportsModalProps) {
   const [appFilter, setAppFilter] = useState<AppFilterType>(initialAppFilter);
@@ -601,23 +603,42 @@ export default function ServiceReportsModal({
               </button>
             </div>
 
-            {/* Search Input */}
-            <div className="relative w-full sm:w-72">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Cari pemohon, instansi, agenda, unit..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3.5 py-2 text-xs rounded-xl bg-white border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 font-medium"
-              />
-              {searchQuery && (
+            {/* Search Input & Action Buttons */}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="relative w-full sm:w-72">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Cari pemohon, instansi, agenda, unit..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3.5 py-2 text-xs rounded-xl bg-white border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 font-medium"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="text-slate-400 hover:text-slate-600 text-xs absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
+                  >
+                    &times;
+                  </button>
+                )}
+              </div>
+
+              {isAdminActive && onClearAllDummyData && (
                 <button
                   type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="text-slate-400 hover:text-slate-600 text-xs absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
+                  onClick={async () => {
+                    if (window.confirm('Hapus semua data dummy / contoh (SajiRapat, SIPERUM, SIPAKAR, SILOGIS, PetaCendera, LAPOR-RT) secara permanen? Data asli Anda tidak akan terhapus.')) {
+                      await onClearAllDummyData();
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-rose-700 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 hover:border-rose-600 transition cursor-pointer whitespace-nowrap shadow-sm"
+                  title="Hapus semua permohonan contoh/dummy dari sistem secara permanen"
                 >
-                  &times;
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Bersihkan Data Dummy</span>
+                  <span className="sm:hidden">Hapus Dummy</span>
                 </button>
               )}
             </div>
