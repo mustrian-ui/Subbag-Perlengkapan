@@ -36,6 +36,9 @@ export interface Vehicle {
   kendaraan: string;
   pemohon: string;
   tujuan: string;
+  tanggal?: string;
+  waktu?: string;
+  jam?: string;
   status: 'Disetujui' | 'Menunggu Validasi' | 'Menunggu Konfirmasi' | 'Selesai' | 'Ditolak' | string;
   documentUrl?: string;
   documentName?: string;

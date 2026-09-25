@@ -163,9 +163,9 @@ export const createServiceSpreadsheet = async (accessToken: string): Promise<str
             ]
           },
           {
-            range: "'Peminjaman Kendaraan'!A1:I1",
+            range: "'Peminjaman Kendaraan'!A1:K1",
             values: [
-              ['ID Permohonan', 'Nama Unit Kendaraan', 'Nama Pejabat / Staff Pemohon', 'Dinas / Instansi', 'Tujuan / Kegiatan', 'Status Persetujuan', 'Waktu Dibuat', 'Tautan Dokumen', 'Nama Dokumen']
+              ['ID Permohonan', 'Nama Unit Kendaraan', 'Tanggal Penggunaan', 'Jam Penggunaan', 'Nama Pejabat / Staff Pemohon', 'Dinas / Instansi', 'Tujuan / Kegiatan', 'Status Persetujuan', 'Waktu Dibuat', 'Tautan Dokumen', 'Nama Dokumen']
             ]
           },
           {
@@ -240,12 +240,14 @@ export const appendBookingToSheet = async (
 export const appendVehicleToSheet = async (
   accessToken: string,
   spreadsheetId: string,
-  vehicle: { id: string; kendaraan: string; pemohon: string; tujuan: string; status: string; documentUrl?: string; documentName?: string; instansi?: string }
+  vehicle: { id: string; kendaraan: string; pemohon: string; tujuan: string; tanggal?: string; jam?: string; waktu?: string; status: string; documentUrl?: string; documentName?: string; instansi?: string }
 ) => {
   const timestamp = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Makassar' });
   const rowValues = [
     vehicle.id,
     vehicle.kendaraan,
+    vehicle.tanggal || '',
+    vehicle.jam || vehicle.waktu || '',
     vehicle.pemohon,
     vehicle.instansi || '',
     vehicle.tujuan,

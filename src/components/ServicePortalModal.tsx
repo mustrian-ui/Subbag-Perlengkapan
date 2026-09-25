@@ -240,6 +240,8 @@ export default function ServicePortalModal({
   // Form states - SIPAKAR
   const [sipCarUnit, setSipCarUnit] = useState('');
   const [sipCarDest, setSipCarDest] = useState('');
+  const [sipCarTanggal, setSipCarTanggal] = useState('');
+  const [sipCarJam, setSipCarJam] = useState('');
   const [sipCarUser, setSipCarUser] = useState('');
   const [sipCarInstansi, setSipCarInstansi] = useState('');
   const [sipCarFile, setSipCarFile] = useState<File | null>(null);
@@ -438,8 +440,8 @@ export default function ServicePortalModal({
 
   const handleSipakarSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!sipCarUnit || !sipCarDest || !sipCarUser || !sipCarInstansi) {
-      showToast('Harap lengkapi data permohonan kendaraan!', 'error');
+    if (!sipCarUnit || !sipCarDest || !sipCarUser || !sipCarInstansi || !sipCarTanggal || !sipCarJam) {
+      showToast('Harap lengkapi semua data permohonan kendaraan, termasuk Tanggal dan Jam!', 'error');
       return;
     }
     if (!sipCarFile) {
@@ -475,6 +477,9 @@ export default function ServicePortalModal({
       pemohon: sipCarUser,
       instansi: sipCarInstansi,
       tujuan: sipCarDest,
+      tanggal: sipCarTanggal,
+      waktu: sipCarJam,
+      jam: sipCarJam,
       status: 'Menunggu Validasi',
       documentUrl: finalDocUrl,
       documentName: finalDocName
@@ -484,6 +489,8 @@ export default function ServicePortalModal({
     showToast(`Permohonan armada ${sipCarUnit} berhasil didaftarkan!`, 'success');
     setSipCarUnit('');
     setSipCarDest('');
+    setSipCarTanggal('');
+    setSipCarJam('');
     setSipCarUser('');
     setSipCarInstansi('');
     setSipCarFile(null);
@@ -1184,6 +1191,37 @@ export default function ServicePortalModal({
                       className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-1 focus:ring-teal-500 focus:outline-none"
                     />
                   </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Tanggal Penggunaan</span>
+                        <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={sipCarTanggal}
+                        onChange={(e) => setSipCarTanggal(e.target.value)}
+                        className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none bg-white font-medium text-slate-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Jam / Waktu</span>
+                        <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Contoh: 08:30 WITA - Selesai"
+                        value={sipCarJam}
+                        onChange={(e) => setSipCarJam(e.target.value)}
+                        className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none bg-white text-slate-800"
+                      />
+                    </div>
+                  </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-600 mb-1">Nama Pejabat / Staff Pemohon</label>
                     <input
@@ -1234,7 +1272,22 @@ export default function ServicePortalModal({
                       <tbody className="divide-y divide-slate-100">
                         {vehicles.map((v) => (
                           <tr key={v.id} className="text-xs text-slate-600 hover:bg-slate-50/50">
-                            <td className="py-3.5 px-3 font-extrabold text-slate-800">{v.kendaraan}</td>
+                            <td className="py-3.5 px-3 font-extrabold text-slate-800">
+                              <div>{v.kendaraan}</div>
+                              {(v.tanggal || v.jam || v.waktu) && (
+                                <div className="text-[10px] text-amber-700 font-bold flex items-center gap-1 mt-1">
+                                  <Calendar className="w-2.5 h-2.5 shrink-0" />
+                                  <span>{v.tanggal}</span>
+                                  {(v.jam || v.waktu) && (
+                                    <>
+                                      <span>•</span>
+                                      <Clock className="w-2.5 h-2.5 shrink-0" />
+                                      <span>{v.jam || v.waktu}</span>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </td>
                             <td className="py-3.5 px-3">
                               <div className="font-bold text-slate-700">{v.tujuan}</div>
                               <div className="text-[10px] text-slate-500">{v.pemohon} ({v.instansi})</div>

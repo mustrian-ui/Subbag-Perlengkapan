@@ -64,11 +64,13 @@ export function exportBookingsCsv(bookings: Booking[]) {
  * Export SIPAKAR Vehicles to CSV
  */
 export function exportVehiclesCsv(vehicles: Vehicle[]) {
-  const headers = ['No', 'ID Permohonan', 'Armada Kendaraan Dinas', 'Instansi / Bagian', 'Nama Pemohon / Driver', 'Tujuan Operasional', 'Status Validasi'];
+  const headers = ['No', 'ID Permohonan', 'Armada Kendaraan Dinas', 'Tanggal Penggunaan', 'Jam Penggunaan', 'Instansi / Bagian', 'Nama Pemohon / Driver', 'Tujuan Operasional', 'Status Validasi'];
   const rows = vehicles.map((v, idx) => [
     idx + 1,
     escapeCsv(v.id),
     escapeCsv(v.kendaraan),
+    escapeCsv(v.tanggal || '-'),
+    escapeCsv(v.jam || v.waktu || '-'),
     escapeCsv(v.instansi || '-'),
     escapeCsv(v.pemohon || '-'),
     escapeCsv(v.tujuan),
