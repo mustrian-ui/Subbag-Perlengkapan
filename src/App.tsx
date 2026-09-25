@@ -14,6 +14,7 @@ import GoogleSheetsPanel from './components/GoogleSheetsPanel';
 import GedungSchedule from './components/GedungSchedule';
 import ComplaintsModal from './components/ComplaintsModal';
 import ServiceReportsModal, { AppFilterType } from './components/ServiceReportsModal';
+import ServicePortalModal, { getServiceType } from './components/ServicePortalModal';
 import { getAccessToken, appendBookingToSheet, appendVehicleToSheet, appendLogisticsToSheet } from './lib/googleSheets';
 import { collection, onSnapshot, setDoc, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from './lib/firebase';
@@ -56,11 +57,60 @@ const DEFAULT_LANDING_CONTENT: LandingPageContent = {
   ]
 };
 
+export const DEFAULT_APPS: Application[] = [
+  {
+    id: 'app_1',
+    title: 'SIPERUM (Pinjam Ruang Rapat)',
+    category: 'internal',
+    icon: 'couch',
+    desc: 'Sistem Elektronik Reservasi Ruang Rapat pada Sekretariat Daerah Kota Tarakan. Lacak jadwal ruangan secara live.'
+  },
+  {
+    id: 'app_2',
+    title: 'SIPAKAR (Layanan Kendaraan Dinas)',
+    category: 'internal',
+    icon: 'car',
+    desc: 'Permohonan surat izin jalan, peminjaman kendaraan operasional dinas, serta pemantauan armada dinas Setda.'
+  },
+  {
+    id: 'app_3',
+    title: 'SILOGIS (Inventaris & ATK)',
+    category: 'logistics',
+    icon: 'box',
+    desc: 'Portal permintaan barang inventaris, alat tulis kantor (ATK), dan logistik rumah tangga secara digital & transparan.'
+  },
+  {
+    id: 'app_4',
+    title: 'LAPOR-RT (Layanan Pengaduan)',
+    category: 'public',
+    icon: 'alert',
+    desc: 'Platform pelaporan kerusakan prasarana, gangguan kebersihan, dan perbaikan fasilitas gedung kantor Setda.'
+  },
+  {
+    id: 'app_5',
+    title: 'SajiRapat (Konsumsi Rapat)',
+    category: 'consumption',
+    icon: 'utensils',
+    desc: 'Fasilitasi penyediaan snack dan konsumsi makan rapat dinas, sosialisasi, dan agenda resmi Sekretariat Daerah.'
+  },
+  {
+    id: 'app_6',
+    title: 'PetaCendera (Cinderamata & Plakat)',
+    category: 'souvenir',
+    icon: 'gift',
+    desc: 'Permohonan cinderamata resmi daerah, plakat khas Kota Tarakan, dan souvenir kehormatan tamu dinas.'
+  }
+];
+
 // Standard building block layouts
 export default function App() {
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [isAdminActive, setIsAdminActive] = useState<boolean>(false);
   const [isAdminLoginOpen, setIsAdminLoginOpen] = useState<boolean>(false);
+
+  // Dedicated Page-based Navigation State ('home' | 'portal' | 'reports')
+  const [currentView, setCurrentView] = useState<'home' | 'portal' | 'reports'>('home');
+  const [activePortalApp, setActivePortalApp] = useState<Application | null>(null);
 
   // Landing Page customizable content state
   const [landingContent, setLandingContent] = useState<LandingPageContent>(DEFAULT_LANDING_CONTENT);
@@ -149,51 +199,6 @@ export default function App() {
     });
 
     // 2. Applications sync
-    const DEFAULT_APPS: Application[] = [
-      {
-        id: 'app_1',
-        title: 'SIPERUM (Pinjam Ruang Rapat)',
-        category: 'internal',
-        icon: 'couch',
-        desc: 'Sistem Elektronik Reservasi Ruang Rapat pada Sekretariat Daerah Kota Tarakan. Lacak jadwal ruangan secara live.'
-      },
-      {
-        id: 'app_2',
-        title: 'SIPAKAR (Layanan Kendaraan Dinas)',
-        category: 'internal',
-        icon: 'car',
-        desc: 'Permohonan surat izin jalan, peminjaman kendaraan operasional dinas, serta pemantauan armada dinas Setda.'
-      },
-      {
-        id: 'app_3',
-        title: 'SILOGIS (Inventaris & ATK)',
-        category: 'logistics',
-        icon: 'box',
-        desc: 'Portal permintaan barang inventaris, alat tulis kantor (ATK), dan logistik rumah tangga secara digital & transparan.'
-      },
-      {
-        id: 'app_4',
-        title: 'LAPOR-RT (Layanan Pengaduan)',
-        category: 'public',
-        icon: 'alert',
-        desc: 'Platform pelaporan kerusakan prasarana, gangguan kebersihan, dan perbaikan fasilitas gedung kantor Setda.'
-      },
-      {
-        id: 'app_5',
-        title: 'SajiRapat (Konsumsi Rapat)',
-        category: 'consumption',
-        icon: 'utensils',
-        desc: 'Fasilitasi penyediaan snack dan konsumsi makan rapat dinas, sosialisasi, dan agenda resmi Sekretariat Daerah.'
-      },
-      {
-        id: 'app_6',
-        title: 'PetaCendera (Cinderamata & Plakat)',
-        category: 'souvenir',
-        icon: 'gift',
-        desc: 'Permohonan cinderamata resmi daerah, plakat khas Kota Tarakan, dan souvenir kehormatan tamu dinas.'
-      }
-    ];
-
     const appsRef = collection(db, 'applications');
     const unsubApps = onSnapshot(appsRef, (snap) => {
       if (!snap.empty) {
@@ -747,6 +752,84 @@ export default function App() {
     }
   };
 
+  // Dedicated Page Navigation Handlers
+  const handleOpenPortal = (app: Application) => {
+    setActivePortalApp(app);
+    setCurrentView('portal');
+    const serviceType = getServiceType(app);
+    window.location.hash = `portal/${serviceType || app.id}`;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleOpenReports = (filter?: AppFilterType) => {
+    setServiceReportsInitialFilter(filter || 'all');
+    setCurrentView('reports');
+    window.location.hash = 'laporan';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleBackToHome = (targetSectionId?: string) => {
+    setCurrentView('home');
+    setActivePortalApp(null);
+    setIsServiceReportsModalOpen(false);
+    setIsComplaintsModalOpen(false);
+    if (targetSectionId && typeof targetSectionId === 'string' && targetSectionId !== 'beranda') {
+      window.location.hash = targetSectionId;
+      setTimeout(() => {
+        const element = document.getElementById(targetSectionId);
+        if (element) {
+          const headerOffset = 110;
+          const elementPosition = element.getBoundingClientRect().top;
+          const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+          window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+        }
+      }, 100);
+    } else {
+      window.location.hash = '';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  // Synchronize Browser URL Hash to enable direct URLs, Back/Forward browser buttons
+  useEffect(() => {
+    const handleHashChange = () => {
+      const rawHash = window.location.hash.replace(/^#\/?/, '');
+      if (!rawHash) {
+        if (currentView !== 'home') {
+          setCurrentView('home');
+          setActivePortalApp(null);
+        }
+        return;
+      }
+
+      if (rawHash.startsWith('portal/')) {
+        const target = rawHash.replace('portal/', '').toLowerCase();
+        const found = applications.find(a => 
+          a.id.toLowerCase() === target || 
+          getServiceType(a) === target
+        ) || DEFAULT_APPS.find(a => 
+          a.id.toLowerCase() === target || 
+          getServiceType(a) === target
+        );
+        if (found) {
+          setActivePortalApp(found);
+          setCurrentView('portal');
+        }
+      } else if (rawHash === 'laporan' || rawHash === 'reports' || rawHash === 'pusat-tindakan') {
+        setCurrentView('reports');
+      } else if (['beranda', 'visi-misi', 'aplikasi', 'jadwal-gedung', 'galeri', 'kontak'].includes(rawHash)) {
+        if (currentView !== 'home') {
+          setCurrentView('home');
+          setActivePortalApp(null);
+        }
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    handleHashChange();
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [applications]);
+
   return (
     <div className="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col antialiased">
       
@@ -761,11 +844,15 @@ export default function App() {
           logistics.filter(l => !l.status || l.status.toLowerCase().includes('menunggu') || l.status.toLowerCase().includes('pending') || l.status.toLowerCase().includes('diproses')).length +
           complaints.filter(c => c.status === 'Masuk').length
         }
-        onOpenComplaints={() => setIsComplaintsModalOpen(true)}
-        onOpenServiceReports={() => {
-          setServiceReportsInitialFilter('all');
-          setIsServiceReportsModalOpen(true);
+        onOpenComplaints={() => {
+          const laporApp = applications.find(a => getServiceType(a) === 'lapor') || DEFAULT_APPS.find(a => getServiceType(a) === 'lapor');
+          if (laporApp) {
+            handleOpenPortal(laporApp);
+          } else {
+            handleOpenReports('lapor');
+          }
         }}
+        onOpenServiceReports={() => handleOpenReports('all')}
         onClearDummyData={handleClearAllDummyData}
         onLogout={async () => {
           try {
@@ -783,6 +870,8 @@ export default function App() {
       <Navbar 
         isAdminActive={isAdminActive}
         onAdminClick={() => setIsAdminLoginOpen(true)}
+        currentView={currentView}
+        onNavigateHome={handleBackToHome}
         onLogoutAdmin={async () => {
           try {
             localStorage.removeItem('admin_bypass_active');
@@ -795,118 +884,180 @@ export default function App() {
         }}
       />
 
-      {/* 3. CORE LANDING PAGE SECTIONS */}
+      {/* 3. CORE APPLICATION & LANDING VIEWS */}
       <main className="flex-grow">
-        
-        {/* Hero Banner Section */}
-        <Hero 
-          onAksesClick={() => handleScrollToSection('aplikasi')}
-          onVisiClick={() => handleScrollToSection('visi-misi')}
-          isAdminActive={isAdminActive}
-          content={landingContent}
-          onEditTrigger={() => {
-            setLandingEditTab('hero');
-            setIsLandingEditOpen(true);
-          }}
-        />
-
-        {/* Region Policy Visi & Misi Section */}
-        <VisiMisi 
-          isAdminActive={isAdminActive}
-          content={landingContent}
-          onEditTrigger={() => {
-            setLandingEditTab('visimisi');
-            setIsLandingEditOpen(true);
-          }}
-        />
-
-        {/* Google Sheets Live Syncer Panel (visible only when logged in as admin) */}
-        {isAdminActive && (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 animate-in fade-in duration-300">
-            <GoogleSheetsPanel 
-              bookings={bookings}
-              vehicles={vehicles}
-              sajiRapat={sajiRapat}
-              cinderamata={cinderamata}
-              logistics={logistics}
-              complaints={complaints}
-              onShowToast={triggerToast}
+        {currentView === 'portal' && activePortalApp ? (
+          <ServicePortalModal
+            isFullPage={true}
+            activeMicroApp={activePortalApp}
+            onClose={() => handleBackToHome('aplikasi')}
+            isAdminActive={isAdminActive}
+            onOpenServiceReportsModal={(filter) => handleOpenReports(filter)}
+            onOpenComplaintsModal={() => handleOpenReports('lapor')}
+            bookings={bookings}
+            onAddBooking={handleAddBooking}
+            onUpdateBookingStatus={handleUpdateBookingStatus}
+            onDeleteBooking={handleDeleteBooking}
+            vehicles={vehicles}
+            onAddVehicle={handleAddVehicle}
+            onUpdateVehicleStatus={handleUpdateVehicleStatus}
+            onDeleteVehicle={handleDeleteVehicle}
+            logistics={logistics}
+            onAddLogistics={handleAddLogistics}
+            onUpdateLogisticsStatus={handleUpdateLogisticsStatus}
+            onDeleteLogistics={handleDeleteLogistics}
+            sajiRapat={sajiRapat}
+            onAddSajiRapat={handleAddSajiRapat}
+            onUpdateSajiRapatStatus={handleUpdateSajiRapatStatus}
+            onDeleteSajiRapat={handleDeleteSajiRapat}
+            cinderamata={cinderamata}
+            onAddCinderamata={handleAddCinderamata}
+            onUpdateCinderamataStatus={handleUpdateCinderamataStatus}
+            onDeleteCinderamata={handleDeleteCinderamata}
+            complaints={complaints}
+            onAddComplaint={handleAddComplaint}
+            onUpdateComplaintStatus={handleUpdateComplaintStatus}
+            onDeleteComplaint={handleDeleteComplaint}
+            showToast={triggerToast}
+          />
+        ) : currentView === 'reports' ? (
+          <ServiceReportsModal
+            isOpen={true}
+            isFullPage={true}
+            onClose={() => handleBackToHome('aplikasi')}
+            initialAppFilter={serviceReportsInitialFilter}
+            isAdminActive={isAdminActive}
+            bookings={bookings}
+            vehicles={vehicles}
+            logistics={logistics}
+            sajiRapat={sajiRapat}
+            cinderamata={cinderamata}
+            complaints={complaints}
+            onUpdateBookingStatus={handleUpdateBookingStatus}
+            onDeleteBooking={handleDeleteBooking}
+            onUpdateVehicleStatus={handleUpdateVehicleStatus}
+            onDeleteVehicle={handleDeleteVehicle}
+            onUpdateLogisticsStatus={handleUpdateLogisticsStatus}
+            onDeleteLogistics={handleDeleteLogistics}
+            onUpdateSajiRapatStatus={handleUpdateSajiRapatStatus}
+            onDeleteSajiRapat={handleDeleteSajiRapat}
+            onUpdateCinderamataStatus={handleUpdateCinderamataStatus}
+            onDeleteCinderamata={handleDeleteCinderamata}
+            onUpdateComplaintStatus={handleUpdateComplaintStatus}
+            onDeleteComplaint={handleDeleteComplaint}
+            onClearAllDummyData={handleClearAllDummyData}
+            showToast={triggerToast}
+          />
+        ) : (
+          <>
+            {/* Hero Banner Section */}
+            <Hero 
+              onAksesClick={() => handleScrollToSection('aplikasi')}
+              onVisiClick={() => handleScrollToSection('visi-misi')}
+              isAdminActive={isAdminActive}
+              content={landingContent}
+              onEditTrigger={() => {
+                setLandingEditTab('hero');
+                setIsLandingEditOpen(true);
+              }}
             />
-          </div>
+
+            {/* Region Policy Visi & Misi Section */}
+            <VisiMisi 
+              isAdminActive={isAdminActive}
+              content={landingContent}
+              onEditTrigger={() => {
+                setLandingEditTab('visimisi');
+                setIsLandingEditOpen(true);
+              }}
+            />
+
+            {/* Google Sheets Live Syncer Panel (visible only when logged in as admin) */}
+            {isAdminActive && (
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 animate-in fade-in duration-300">
+                <GoogleSheetsPanel 
+                  bookings={bookings}
+                  vehicles={vehicles}
+                  sajiRapat={sajiRapat}
+                  cinderamata={cinderamata}
+                  logistics={logistics}
+                  complaints={complaints}
+                  onShowToast={triggerToast}
+                />
+              </div>
+            )}
+
+            {/* Digital Interactive Application Grid & Micro-Apps Forms */}
+            <AppGrid 
+              isAdminActive={isAdminActive}
+              applications={applications}
+              onAddApplication={handleAddApplication}
+              onEditApplication={handleEditApplication}
+              onDeleteApplication={handleDeleteApplication}
+              onOpenPortal={handleOpenPortal}
+              
+              bookings={bookings}
+              onAddBooking={handleAddBooking}
+              onUpdateBookingStatus={handleUpdateBookingStatus}
+              onDeleteBooking={handleDeleteBooking}
+              
+              vehicles={vehicles}
+              onAddVehicle={handleAddVehicle}
+              onUpdateVehicleStatus={handleUpdateVehicleStatus}
+              onDeleteVehicle={handleDeleteVehicle}
+              
+              logistics={logistics}
+              onAddLogistics={handleAddLogistics}
+              onUpdateLogisticsStatus={handleUpdateLogisticsStatus}
+              onDeleteLogistics={handleDeleteLogistics}
+
+              sajiRapat={sajiRapat}
+              onAddSajiRapat={handleAddSajiRapat}
+              onUpdateSajiRapatStatus={handleUpdateSajiRapatStatus}
+              onDeleteSajiRapat={handleDeleteSajiRapat}
+
+              cinderamata={cinderamata}
+              onAddCinderamata={handleAddCinderamata}
+              onUpdateCinderamataStatus={handleUpdateCinderamataStatus}
+              onDeleteCinderamata={handleDeleteCinderamata}
+
+              complaints={complaints}
+              onOpenComplaintsModal={() => handleOpenReports('lapor')}
+              onAddComplaint={handleAddComplaint}
+              onUpdateComplaintStatus={handleUpdateComplaintStatus}
+              onDeleteComplaint={handleDeleteComplaint}
+
+              onOpenServiceReportsModal={(filter) => handleOpenReports(filter)}
+              
+              showToast={triggerToast}
+            />
+
+            {/* Jadwal Penggunaan Gedung Serba Guna Kantor Walikota Section */}
+            <GedungSchedule 
+              isAdminActive={isAdminActive}
+              schedules={schedules}
+              onAddSchedule={handleAddSchedule}
+              onUpdateSchedule={handleUpdateSchedule}
+              onDeleteSchedule={handleDeleteSchedule}
+              showToast={triggerToast}
+            />
+
+            {/* Documented Activity Snapshots Section */}
+            <GallerySection 
+              isAdminActive={isAdminActive}
+              galleryItems={galleryItems}
+              onAddGalleryItem={handleAddGalleryItem}
+              onDeleteGalleryItem={handleDeleteGalleryItem}
+              showToast={triggerToast}
+            />
+
+            {/* Direct In-App Government Feedback Forms Section */}
+            <ContactForm 
+              showToast={triggerToast} 
+              onAddComplaint={handleAddComplaint}
+            />
+          </>
         )}
-
-        {/* Digital Interactive Application Grid & Micro-Apps Forms */}
-        <AppGrid 
-          isAdminActive={isAdminActive}
-          applications={applications}
-          onAddApplication={handleAddApplication}
-          onEditApplication={handleEditApplication}
-          onDeleteApplication={handleDeleteApplication}
-          
-          bookings={bookings}
-          onAddBooking={handleAddBooking}
-          onUpdateBookingStatus={handleUpdateBookingStatus}
-          onDeleteBooking={handleDeleteBooking}
-          
-          vehicles={vehicles}
-          onAddVehicle={handleAddVehicle}
-          onUpdateVehicleStatus={handleUpdateVehicleStatus}
-          onDeleteVehicle={handleDeleteVehicle}
-          
-          logistics={logistics}
-          onAddLogistics={handleAddLogistics}
-          onUpdateLogisticsStatus={handleUpdateLogisticsStatus}
-          onDeleteLogistics={handleDeleteLogistics}
-
-          sajiRapat={sajiRapat}
-          onAddSajiRapat={handleAddSajiRapat}
-          onUpdateSajiRapatStatus={handleUpdateSajiRapatStatus}
-          onDeleteSajiRapat={handleDeleteSajiRapat}
-
-          cinderamata={cinderamata}
-          onAddCinderamata={handleAddCinderamata}
-          onUpdateCinderamataStatus={handleUpdateCinderamataStatus}
-          onDeleteCinderamata={handleDeleteCinderamata}
-
-          complaints={complaints}
-          onOpenComplaintsModal={() => setIsComplaintsModalOpen(true)}
-          onAddComplaint={handleAddComplaint}
-          onUpdateComplaintStatus={handleUpdateComplaintStatus}
-          onDeleteComplaint={handleDeleteComplaint}
-
-          onOpenServiceReportsModal={(filter) => {
-            setServiceReportsInitialFilter(filter || 'all');
-            setIsServiceReportsModalOpen(true);
-          }}
-          
-          showToast={triggerToast}
-        />
-
-        {/* Jadwal Penggunaan Gedung Serba Guna Kantor Walikota Section */}
-        <GedungSchedule 
-          isAdminActive={isAdminActive}
-          schedules={schedules}
-          onAddSchedule={handleAddSchedule}
-          onUpdateSchedule={handleUpdateSchedule}
-          onDeleteSchedule={handleDeleteSchedule}
-          showToast={triggerToast}
-        />
-
-        {/* Documented Activity Snapshots Section */}
-        <GallerySection 
-          isAdminActive={isAdminActive}
-          galleryItems={galleryItems}
-          onAddGalleryItem={handleAddGalleryItem}
-          onDeleteGalleryItem={handleDeleteGalleryItem}
-          showToast={triggerToast}
-        />
-
-        {/* Direct In-App Government Feedback Forms Section */}
-        <ContactForm 
-          showToast={triggerToast} 
-          onAddComplaint={handleAddComplaint}
-        />
-
       </main>
 
       {/* 4. MAIN FOOTER AREA */}
@@ -994,36 +1145,6 @@ export default function App() {
           complaints={complaints}
           onUpdateStatus={handleUpdateComplaintStatus}
           onDeleteComplaint={handleDeleteComplaint}
-          showToast={triggerToast}
-        />
-      )}
-
-      {/* 4.7. UNIFIED ALL-APPLICATION ACTIONABLE REPORTS MODAL (SIPERUM, SIPAKAR, SILOGIS, LAPOR-RT) */}
-      {isServiceReportsModalOpen && (
-        <ServiceReportsModal
-          isOpen={isServiceReportsModalOpen}
-          onClose={() => setIsServiceReportsModalOpen(false)}
-          initialAppFilter={serviceReportsInitialFilter}
-          isAdminActive={isAdminActive}
-          bookings={bookings}
-          vehicles={vehicles}
-          logistics={logistics}
-          sajiRapat={sajiRapat}
-          cinderamata={cinderamata}
-          complaints={complaints}
-          onUpdateBookingStatus={handleUpdateBookingStatus}
-          onDeleteBooking={handleDeleteBooking}
-          onUpdateVehicleStatus={handleUpdateVehicleStatus}
-          onDeleteVehicle={handleDeleteVehicle}
-          onUpdateLogisticsStatus={handleUpdateLogisticsStatus}
-          onDeleteLogistics={handleDeleteLogistics}
-          onUpdateSajiRapatStatus={handleUpdateSajiRapatStatus}
-          onDeleteSajiRapat={handleDeleteSajiRapat}
-          onUpdateCinderamataStatus={handleUpdateCinderamataStatus}
-          onDeleteCinderamata={handleDeleteCinderamata}
-          onUpdateComplaintStatus={handleUpdateComplaintStatus}
-          onDeleteComplaint={handleDeleteComplaint}
-          onClearAllDummyData={handleClearAllDummyData}
           showToast={triggerToast}
         />
       )}

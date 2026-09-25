@@ -1,21 +1,29 @@
 import { useState } from 'react';
-import { Menu, X, Shield, UserCheck } from 'lucide-react';
+import { Menu, X, Shield, UserCheck, ArrowLeft } from 'lucide-react';
 
 interface NavbarProps {
   isAdminActive: boolean;
   onAdminClick: () => void;
   onLogoutAdmin: () => void;
+  currentView?: 'home' | 'portal' | 'reports';
+  onNavigateHome?: (sectionId?: string) => void;
 }
 
 export default function Navbar({
   isAdminActive,
   onAdminClick,
-  onLogoutAdmin
+  onLogoutAdmin,
+  currentView = 'home',
+  onNavigateHome
 }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const scrollToSection = (id: string) => {
     setMobileMenuOpen(false);
+    if (currentView !== 'home' && onNavigateHome) {
+      onNavigateHome(id);
+      return;
+    }
     const element = document.getElementById(id);
     if (element) {
       const headerOffset = 110; // offset for sticky header and admin bar
@@ -26,6 +34,8 @@ export default function Navbar({
         top: offsetPosition,
         behavior: 'smooth'
       });
+    } else if (onNavigateHome) {
+      onNavigateHome(id);
     }
   };
 
@@ -77,8 +87,19 @@ export default function Navbar({
             ))}
           </nav>
 
-          {/* Admin Action Button and Mobile Hamburger */}
+          {/* Admin Action Button, Back Button and Mobile Hamburger */}
           <div className="flex items-center space-x-2.5">
+            {currentView !== 'home' && (
+              <button
+                onClick={() => scrollToSection('beranda')}
+                className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-blue-950 bg-blue-50 border border-blue-200 hover:bg-blue-100 cursor-pointer transition"
+                title="Kembali ke Halaman Beranda"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Beranda</span>
+              </button>
+            )}
+
             {isAdminActive ? (
               <button
                 onClick={onLogoutAdmin}

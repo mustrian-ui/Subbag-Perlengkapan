@@ -66,6 +66,7 @@ interface AppGridProps {
   onDeleteComplaint?: (id: string) => Promise<void>;
 
   onOpenServiceReportsModal?: (appFilter?: AppFilterType) => void;
+  onOpenPortal?: (app: Application) => void;
   
   showToast: (msg: string, type: 'success' | 'error' | 'info') => void;
 }
@@ -133,6 +134,7 @@ export default function AppGrid({
   onDeleteComplaint,
 
   onOpenServiceReportsModal,
+  onOpenPortal,
   
   showToast
 }: AppGridProps) {
@@ -352,8 +354,12 @@ export default function AppGrid({
                 <div className="pt-4 mt-6 border-t border-slate-100 space-y-2">
                   <button
                     onClick={() => {
-                      showToast(`Memuat Portal ${app.title}...`, 'info');
-                      setActiveMicroApp(app);
+                      if (onOpenPortal) {
+                        onOpenPortal(app);
+                      } else {
+                        showToast(`Memuat Portal ${app.title}...`, 'info');
+                        setActiveMicroApp(app);
+                      }
                     }}
                     className="w-full py-2.5 rounded-xl bg-slate-50 text-slate-700 hover:bg-blue-900 hover:text-white text-xs sm:text-sm font-extrabold flex items-center justify-center gap-1.5 transition duration-200 cursor-pointer border border-slate-200"
                   >
@@ -504,9 +510,9 @@ export default function AppGrid({
       )}
 
       {/* ======================================================== */}
-      {/* 2. INTERACTIVE MODAL FOR MICRO-APPLICATIONS PORTAL */}
+      {/* 2. INTERACTIVE MODAL FOR MICRO-APPLICATIONS PORTAL (FALLBACK ONLY) */}
       {/* ======================================================== */}
-      {activeMicroApp && (
+      {!onOpenPortal && activeMicroApp && (
         <ServicePortalModal
           activeMicroApp={activeMicroApp}
           onClose={() => setActiveMicroApp(null)}

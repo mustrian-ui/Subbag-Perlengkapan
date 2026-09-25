@@ -21,7 +21,10 @@ import {
   Layers,
   ChevronRight,
   Phone,
-  Package
+  Package,
+  ArrowLeft,
+  Home,
+  Shield
 } from 'lucide-react';
 import { Booking, Vehicle, LogisticsRequest, SajiRapatRequest, CinderamataRequest, Complaint } from '../types';
 
@@ -33,6 +36,7 @@ interface ServiceReportsModalProps {
   onClose: () => void;
   initialAppFilter?: AppFilterType;
   isAdminActive: boolean;
+  isFullPage?: boolean;
   bookings: Booking[];
   vehicles: Vehicle[];
   logistics: LogisticsRequest[];
@@ -98,7 +102,8 @@ export default function ServiceReportsModal({
   onUpdateComplaintStatus,
   onDeleteComplaint,
   onClearAllDummyData,
-  showToast
+  showToast,
+  isFullPage = true
 }: ServiceReportsModalProps) {
   const [appFilter, setAppFilter] = useState<AppFilterType>(initialAppFilter);
   const [statusFilter, setStatusFilter] = useState<StatusFilterType>('all');
@@ -383,8 +388,44 @@ export default function ServiceReportsModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
-      <div className="bg-white rounded-3xl w-full max-w-5xl overflow-hidden shadow-2xl border border-slate-100 transform scale-100 transition-all duration-300 my-8 max-h-[92vh] flex flex-col">
+    <div className={isFullPage ? "min-h-screen bg-slate-100/70 pb-20 animate-fade-in text-slate-800" : "fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in overflow-y-auto"}>
+      {isFullPage && (
+        <div className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs backdrop-blur-md bg-white/95">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs transition cursor-pointer border border-slate-200 shadow-xs"
+              >
+                <ArrowLeft className="w-4 h-4 text-slate-600" />
+                <span>Kembali ke Beranda</span>
+              </button>
+              <div className="h-4 w-px bg-slate-200 hidden sm:block" />
+              <nav className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                <button onClick={onClose} className="hover:text-blue-900 cursor-pointer flex items-center gap-1 font-semibold">
+                  <Home className="w-3.5 h-3.5" />
+                  <span>Beranda</span>
+                </button>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                <span className="font-extrabold text-emerald-950 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                  Pusat Tindakan &amp; Rekap Layanan
+                </span>
+              </nav>
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 text-xs font-black border border-emerald-300 flex items-center gap-1.5 shadow-xs">
+                <Shield className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Mode Administrator Aktif</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className={isFullPage ? "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8" : "bg-white rounded-3xl w-full max-w-5xl overflow-hidden shadow-2xl border border-slate-100 transform scale-100 transition-all duration-300 my-8 max-h-[92vh] flex flex-col"}>
+        <div className={isFullPage ? "bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden flex flex-col" : "contents"}>
         
         {/* Header with App Filters */}
         <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-blue-950 text-white p-6 relative flex flex-col md:flex-row md:items-center justify-between gap-4 flex-shrink-0">
@@ -407,8 +448,16 @@ export default function ServiceReportsModal({
             onClick={onClose}
             className="self-end md:self-auto text-white/80 hover:text-white transition p-2 bg-white/10 hover:bg-white/20 rounded-2xl cursor-pointer"
             aria-label="Tutup"
+            title="Kembali ke Beranda"
           >
-            <X className="w-5 h-5" />
+            {isFullPage ? (
+              <div className="flex items-center gap-1.5 text-xs font-bold px-2 py-0.5">
+                <ArrowLeft className="w-4 h-4" />
+                <span>Kembali</span>
+              </div>
+            ) : (
+              <X className="w-5 h-5" />
+            )}
           </button>
         </div>
 
@@ -937,10 +986,11 @@ export default function ServiceReportsModal({
             onClick={onClose}
             className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs transition cursor-pointer"
           >
-            Tutup
+            {isFullPage ? 'Kembali ke Beranda' : 'Tutup'}
           </button>
         </div>
 
+        </div>
       </div>
     </div>
   );

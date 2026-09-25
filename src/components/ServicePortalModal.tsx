@@ -19,7 +19,11 @@ import {
   MessageSquareText,
   Utensils,
   Gift,
-  AlertTriangle
+  AlertTriangle,
+  ArrowLeft,
+  Home,
+  Shield,
+  Layers
 } from 'lucide-react';
 import { 
   Application, 
@@ -145,6 +149,7 @@ interface ServicePortalModalProps {
   isAdminActive: boolean;
   onOpenServiceReportsModal?: (filter: AppFilterType) => void;
   onOpenComplaintsModal?: () => void;
+  isFullPage?: boolean;
 
   bookings: Booking[];
   onAddBooking: (b: Booking) => void;
@@ -209,7 +214,8 @@ export default function ServicePortalModal({
   onAddComplaint,
   onUpdateComplaintStatus,
   onDeleteComplaint,
-  showToast
+  showToast,
+  isFullPage = true
 }: ServicePortalModalProps) {
   const [activeServiceType, setActiveServiceType] = useState<AppFilterType>(() => activeMicroApp ? getServiceType(activeMicroApp) : 'siperum');
 
@@ -771,68 +777,145 @@ export default function ServicePortalModal({
 
   const activeServiceInfo = getActiveServiceInfo();
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
-      <div className="bg-white rounded-3xl w-full max-w-4xl overflow-hidden shadow-2xl border border-slate-100 transform scale-100 transition-all duration-300 my-8">
-        
-        {/* Dynamic Modal Header matching application title */}
-        <div className={`p-6 text-white relative flex items-center justify-between ${activeServiceInfo.gradient}`}>
-          <div className="space-y-1">
-            <span className="text-[10px] uppercase font-black tracking-widest text-slate-200 block">
-              Portal Layanan Digital • Subbag RT &amp; Perlengkapan Setda Tarakan
-            </span>
-            <h3 className="text-lg sm:text-2xl font-black flex items-center gap-2 font-display">
-              {activeServiceInfo.title}
-            </h3>
-            <p className="text-xs text-slate-200/90 max-w-xl line-clamp-1">{activeServiceInfo.desc}</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-white/80 hover:text-white transition p-2 bg-white/10 hover:bg-white/20 rounded-xl cursor-pointer"
-            title="Tutup Formulir"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+  const handleTabChange = (newType: AppFilterType) => {
+    setActiveServiceType(newType);
+    if (typeof window !== 'undefined') {
+      window.location.hash = `portal/${newType}`;
+    }
+  };
 
-        {/* Quick Service Switcher Tabs */}
-        <div className="bg-slate-100/90 border-b border-slate-200 px-4 py-2.5 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
-          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mr-1 shrink-0 hidden sm:inline">Pilih Layanan:</span>
-          {[
-            { id: 'sajirapat' as AppFilterType, label: 'SajiRapat (Konsumsi)', icon: Utensils, count: sajiRapat.length, activeClass: 'text-orange-950 bg-orange-100 border-orange-400 shadow-sm' },
-            { id: 'siperum' as AppFilterType, label: 'SIPERUM (Ruang Rapat)', icon: Briefcase, count: bookings.length, activeClass: 'text-teal-950 bg-teal-100 border-teal-400 shadow-sm' },
-            { id: 'sipakar' as AppFilterType, label: 'SIPAKAR (Kendaraan)', icon: Car, count: vehicles.length, activeClass: 'text-amber-950 bg-amber-100 border-amber-400 shadow-sm' },
-            { id: 'petacendera' as AppFilterType, label: 'PetaCendera (Plakat)', icon: Gift, count: cinderamata.length, activeClass: 'text-purple-950 bg-purple-100 border-purple-400 shadow-sm' },
-            { id: 'silogis' as AppFilterType, label: 'SILOGIS (ATK/Logistik)', icon: Package, count: logistics.length, activeClass: 'text-blue-950 bg-blue-100 border-blue-400 shadow-sm' },
-            { id: 'lapor' as AppFilterType, label: 'LAPOR-RT (Pengaduan)', icon: AlertTriangle, count: complaints.length, activeClass: 'text-rose-950 bg-rose-100 border-rose-400 shadow-sm' },
-          ].map(tab => {
-            const Icon = tab.icon;
-            const isActive = activeServiceType === tab.id;
-            return (
+  return (
+    <div className={isFullPage ? "min-h-screen bg-slate-100/70 pb-20 animate-fade-in text-slate-800" : "fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in overflow-y-auto"}>
+      
+      {/* Dedicated Breadcrumb / Return Top Bar when rendered as Full Page */}
+      {isFullPage && (
+        <div className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs backdrop-blur-md bg-white/95">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
               <button
-                key={tab.id}
                 type="button"
-                onClick={() => setActiveServiceType(tab.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shrink-0 cursor-pointer border ${
-                  isActive
-                    ? `${tab.activeClass} ring-1 ring-black/5 scale-[1.02]`
-                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-900'
-                }`}
+                onClick={onClose}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs transition cursor-pointer border border-slate-200 shadow-xs"
               >
-                <Icon className="w-3.5 h-3.5 shrink-0" />
-                <span>{tab.label}</span>
-                {tab.count > 0 && (
-                  <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ${isActive ? 'bg-black/10' : 'bg-slate-100 text-slate-500'}`}>
-                    {tab.count}
-                  </span>
+                <ArrowLeft className="w-4 h-4 text-slate-600" />
+                <span>Kembali ke Beranda</span>
+              </button>
+              <div className="h-4 w-px bg-slate-200 hidden sm:block" />
+              <nav className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                <button onClick={onClose} className="hover:text-blue-900 cursor-pointer flex items-center gap-1 font-semibold">
+                  <Home className="w-3.5 h-3.5" />
+                  <span>Beranda</span>
+                </button>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                <span className="text-slate-400">Portal Layanan</span>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                <span className="font-extrabold text-blue-950 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                  {activeServiceInfo.title}
+                </span>
+              </nav>
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              {isAdminActive && (
+                <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 text-xs font-black border border-emerald-300 flex items-center gap-1.5 shadow-xs">
+                  <Shield className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Mode Administrator</span>
+                </span>
+              )}
+              {isAdminActive && onOpenServiceReportsModal && (
+                <button
+                  type="button"
+                  onClick={() => onOpenServiceReportsModal(activeServiceType)}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  title="Buka Pusat Rekapitulasi Data & Tindakan"
+                >
+                  <Layers className="w-4 h-4 text-emerald-100" />
+                  <span>Rekap &amp; Tindakan Admin</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className={isFullPage ? "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8" : "bg-white rounded-3xl w-full max-w-4xl overflow-hidden shadow-2xl border border-slate-100 transform scale-100 transition-all duration-300 my-8"}>
+        <div className={isFullPage ? "bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden" : ""}>
+        
+          {/* Dynamic Header matching application title */}
+          <div className={`${isFullPage ? 'p-6 sm:p-8' : 'p-6'} text-white relative flex flex-col md:flex-row md:items-center justify-between gap-4 ${activeServiceInfo.gradient}`}>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] uppercase font-black tracking-widest text-emerald-300 bg-black/25 px-2.5 py-0.5 rounded-full border border-white/15 backdrop-blur-xs">
+                  Portal Layanan Digital
+                </span>
+                <span className="text-[11px] font-bold text-slate-200">
+                  Subbag RT &amp; Perlengkapan Setda Kota Tarakan
+                </span>
+              </div>
+              <h1 className={`${isFullPage ? 'text-xl sm:text-3xl' : 'text-lg sm:text-2xl'} font-black flex items-center gap-2.5 font-display tracking-tight`}>
+                {activeServiceInfo.title}
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-200 max-w-3xl leading-relaxed">
+                {activeServiceInfo.desc}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={onClose}
+                className="flex items-center gap-2 px-4 py-2 bg-white/15 hover:bg-white/25 rounded-xl text-white font-bold text-xs transition cursor-pointer border border-white/20 backdrop-blur-xs"
+                title="Kembali ke Beranda"
+              >
+                {isFullPage ? (
+                  <>
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>Kembali ke Beranda</span>
+                  </>
+                ) : (
+                  <X className="w-5 h-5" />
                 )}
               </button>
-            );
-          })}
-        </div>
+            </div>
+          </div>
 
-        {/* Modal Content Body */}
-        <div className="p-6 sm:p-8">
+          {/* Quick Service Switcher Tabs */}
+          <div className="bg-slate-100/90 border-b border-slate-200 px-4 py-2.5 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mr-1 shrink-0 hidden sm:inline">Pilih Layanan:</span>
+            {[
+              { id: 'sajirapat' as AppFilterType, label: 'SajiRapat (Konsumsi)', icon: Utensils, count: sajiRapat.length, activeClass: 'text-orange-950 bg-orange-100 border-orange-400 shadow-sm' },
+              { id: 'siperum' as AppFilterType, label: 'SIPERUM (Ruang Rapat)', icon: Briefcase, count: bookings.length, activeClass: 'text-teal-950 bg-teal-100 border-teal-400 shadow-sm' },
+              { id: 'sipakar' as AppFilterType, label: 'SIPAKAR (Kendaraan)', icon: Car, count: vehicles.length, activeClass: 'text-amber-950 bg-amber-100 border-amber-400 shadow-sm' },
+              { id: 'petacendera' as AppFilterType, label: 'PetaCendera (Plakat)', icon: Gift, count: cinderamata.length, activeClass: 'text-purple-950 bg-purple-100 border-purple-400 shadow-sm' },
+              { id: 'silogis' as AppFilterType, label: 'SILOGIS (ATK/Logistik)', icon: Package, count: logistics.length, activeClass: 'text-blue-950 bg-blue-100 border-blue-400 shadow-sm' },
+              { id: 'lapor' as AppFilterType, label: 'LAPOR-RT (Pengaduan)', icon: AlertTriangle, count: complaints.length, activeClass: 'text-rose-950 bg-rose-100 border-rose-400 shadow-sm' },
+            ].map(tab => {
+              const Icon = tab.icon;
+              const isActive = activeServiceType === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => handleTabChange(tab.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shrink-0 cursor-pointer border ${
+                    isActive
+                      ? `${tab.activeClass} ring-1 ring-black/5 scale-[1.02]`
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5 shrink-0" />
+                  <span>{tab.label}</span>
+                  {tab.count > 0 && (
+                    <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ${isActive ? 'bg-black/10' : 'bg-slate-100 text-slate-500'}`}>
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Modal / Page Content Body */}
+          <div className="p-6 sm:p-8">
 
           {/* ======================================================== */}
           {/* SERVICE 1: SIPERUM (Pinjam Ruang Rapat) */}
@@ -2102,6 +2185,7 @@ export default function ServicePortalModal({
             </div>
           )}
 
+        </div>
         </div>
       </div>
     </div>
