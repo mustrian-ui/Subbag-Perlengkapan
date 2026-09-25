@@ -16,7 +16,8 @@ import {
   Building2, 
   Sparkles,
   CalendarDays,
-  ShieldAlert
+  ShieldAlert,
+  RotateCcw
 } from 'lucide-react';
 import { HallSchedule } from '../types';
 
@@ -27,6 +28,105 @@ interface GedungScheduleProps {
   onUpdateSchedule: (schedule: HallSchedule) => void;
   onDeleteSchedule: (id: string) => void;
   showToast: (msg: string, type: 'success' | 'error' | 'info') => void;
+}
+
+export const MONTH_NAMES = [
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+];
+
+export const DAY_NAMES = [
+  'Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'
+];
+
+/**
+ * Robust date parser for Indonesian date strings
+ * Handles:
+ * - "Senin, 15 September 2026"
+ * - "15 September 2026"
+ * - "2026-09-15"
+ * - "15/09/2026" or "15-09-2026"
+ * - "15 Sep 2026"
+ */
+export function parseScheduleDate(str: string): { day: number; month: number; year: number } | null {
+  if (!str) return null;
+  const s = str.trim().toLowerCase();
+
+  // 1. Try ISO YYYY-MM-DD
+  const isoMatch = s.match(/\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b/);
+  if (isoMatch) {
+    const year = parseInt(isoMatch[1], 10);
+    const month = parseInt(isoMatch[2], 10) - 1; // 0-indexed
+    const day = parseInt(isoMatch[3], 10);
+    if (day >= 1 && day <= 31 && month >= 0 && month <= 11) {
+      return { day, month, year };
+    }
+  }
+
+  // 2. Try DD/MM/YYYY or DD-MM-YYYY
+  const dmyMatch = s.match(/\b(\d{1,2})[-/](\d{1,2})[-/](20\d{2})\b/);
+  if (dmyMatch) {
+    const day = parseInt(dmyMatch[1], 10);
+    const month = parseInt(dmyMatch[2], 10) - 1; // 0-indexed
+    const year = parseInt(dmyMatch[3], 10);
+    if (day >= 1 && day <= 31 && month >= 0 && month <= 11) {
+      return { day, month, year };
+    }
+  }
+
+  // Month lookup dictionary with Indonesian & English variations
+  const monthMap: Record<string, number> = {
+    'januari': 0, 'jan': 0, 'january': 0,
+    'februari': 1, 'feb': 1, 'pebruari': 1, 'peb': 1, 'february': 1,
+    'maret': 2, 'mar': 2, 'march': 2,
+    'april': 3, 'apr': 3,
+    'mei': 4, 'may': 4,
+    'juni': 5, 'jun': 5, 'june': 5,
+    'juli': 6, 'jul': 6, 'july': 6,
+    'agustus': 7, 'ags': 7, 'agu': 7, 'aug': 7, 'august': 7,
+    'september': 8, 'sep': 8, 'sept': 8,
+    'oktober': 9, 'okt': 9, 'oct': 9, 'october': 9,
+    'november': 10, 'nov': 10, 'nopember': 10, 'nop': 10,
+    'desember': 11, 'des': 11, 'dec': 11, 'december': 11
+  };
+
+  // 3. Try "DD Month YYYY" e.g. "15 September 2026" or "Senin, 15 September 2026"
+  const textMatch = s.match(/\b([1-9]|[12]\d|3[01])\s+([a-z]+)(?:\s+(20\d{2}))?\b/i);
+  if (textMatch) {
+    const day = parseInt(textMatch[1], 10);
+    const mStr = textMatch[2].toLowerCase();
+    const year = textMatch[3] ? parseInt(textMatch[3], 10) : new Date().getFullYear();
+    if (mStr in monthMap) {
+      return { day, month: monthMap[mStr], year };
+    }
+  }
+
+  // 4. Try month followed by day, e.g. "September 15, 2026"
+  const mdyMatch = s.match(/\b([a-z]+)\s+([1-9]|[12]\d|3[01])(?:st|nd|rd|th)?(?:,?\s+(20\d{2}))?\b/i);
+  if (mdyMatch) {
+    const mStr = mdyMatch[1].toLowerCase();
+    const day = parseInt(mdyMatch[2], 10);
+    const year = mdyMatch[3] ? parseInt(mdyMatch[3], 10) : new Date().getFullYear();
+    if (mStr in monthMap) {
+      return { day, month: monthMap[mStr], year };
+    }
+  }
+
+  // 5. Look for any recognized month name anywhere in the string + day number
+  for (const [mName, mIdx] of Object.entries(monthMap)) {
+    const mRegex = new RegExp(`\\b${mName}\\b`, 'i');
+    if (mRegex.test(s)) {
+      const dayMatch = s.match(/\b([1-9]|[12]\d|3[01])\b/);
+      const yearMatch = s.match(/\b(20\d{2})\b/);
+      if (dayMatch) {
+        const day = parseInt(dayMatch[1], 10);
+        const year = yearMatch ? parseInt(yearMatch[1], 10) : new Date().getFullYear();
+        return { day, month: mIdx, year };
+      }
+    }
+  }
+
+  return null;
 }
 
 // Fixed Annual State/City Events held in GSG Kantor Walikota Tarakan
@@ -56,23 +156,29 @@ export default function GedungSchedule({
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<HallSchedule | null>(null);
 
-  // Calendar state: defaults to current date (e.g. 2026)
-  const [currentDate, setCurrentDate] = useState(() => new Date(2026, 5, 1)); // Juni 2026
+  // Calendar state: dynamically defaults to today's date
+  const [currentDate, setCurrentDate] = useState(() => new Date());
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [filterScope, setFilterScope] = useState<'month' | 'all'>('month');
 
   // Form states
   const [hariTanggal, setHariTanggal] = useState('');
+  const [datePickerValue, setDatePickerValue] = useState('');
   const [kegiatan, setKegiatan] = useState('');
   const [instansi, setInstansi] = useState('');
   const [keterangan, setKeterangan] = useState('Lengkap');
 
-  const monthNames = [
-    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-  ];
+  const monthNames = MONTH_NAMES;
+  const dayNames = DAY_NAMES;
 
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth();
+
+  // Today checks
+  const today = new Date();
+  const isCurrentMonthToday = 
+    today.getFullYear() === currentYear && 
+    today.getMonth() === currentMonth;
 
   const handlePrevMonth = () => {
     setCurrentDate(new Date(currentYear, currentMonth - 1, 1));
@@ -84,10 +190,17 @@ export default function GedungSchedule({
     setSelectedDay(null);
   };
 
+  const handleGoToToday = () => {
+    const now = new Date();
+    setCurrentDate(new Date(now.getFullYear(), now.getMonth(), 1));
+    setSelectedDay(now.getDate());
+    showToast(`Menampilkan kalender hari ini: ${now.getDate()} ${monthNames[now.getMonth()]} ${now.getFullYear()}`, 'info');
+  };
+
   // Days in month calculation
   const { calendarDays, daysInMonth } = useMemo(() => {
     const firstDay = new Date(currentYear, currentMonth, 1).getDay();
-    // In Indonesia Monday is often day 0 or 1, let's normalize Sunday=0 -> 6, Monday=1 -> 0
+    // Normalize Sunday=0 -> 6, Monday=1 -> 0
     const startOffset = (firstDay + 6) % 7;
     const totalDays = new Date(currentYear, currentMonth + 1, 0).getDate();
 
@@ -101,23 +214,24 @@ export default function GedungSchedule({
     return { calendarDays: days, daysInMonth: totalDays };
   }, [currentYear, currentMonth]);
 
-  // Map schedules to dates
+  // Map schedules to dates strictly for the currentMonth and currentYear
   const scheduleDayMap = useMemo(() => {
     const map = new Map<number, HallSchedule[]>();
     schedules.forEach(item => {
-      // Try to parse day from string like "19 Juni 2026" or "Senin, 15 Juni 2026"
-      const match = item.hariTanggal.match(/\b(\d{1,2})\b/);
-      if (match) {
-        const day = parseInt(match[1], 10);
-        if (day >= 1 && day <= 31) {
-          const list = map.get(day) || [];
-          list.push(item);
-          map.set(day, list);
+      const parsed = parseScheduleDate(item.hariTanggal);
+      if (parsed) {
+        // Schedule MUST strictly match both current month and year!
+        if (parsed.month === currentMonth && parsed.year === currentYear) {
+          if (parsed.day >= 1 && parsed.day <= 31) {
+            const list = map.get(parsed.day) || [];
+            list.push(item);
+            map.set(parsed.day, list);
+          }
         }
       }
     });
     return map;
-  }, [schedules]);
+  }, [schedules, currentMonth, currentYear]);
 
   // Annual events map for current month
   const annualDayMap = useMemo(() => {
@@ -135,9 +249,28 @@ export default function GedungSchedule({
     return map;
   }, [currentMonth]);
 
+  const handleDatePickerChange = (isoDate: string) => {
+    setDatePickerValue(isoDate);
+    if (!isoDate) return;
+    const [y, m, d] = isoDate.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    const dayName = dayNames[dt.getDay()];
+    const mName = monthNames[m - 1];
+    setHariTanggal(`${dayName}, ${d} ${mName} ${y}`);
+  };
+
   const handleOpenAdd = () => {
     setEditingSchedule(null);
-    setHariTanggal(selectedDay ? `${selectedDay} ${monthNames[currentMonth]} ${currentYear}` : '');
+    const dayToUse = selectedDay || (isCurrentMonthToday ? today.getDate() : 1);
+    const dt = new Date(currentYear, currentMonth, dayToUse);
+    const dayName = dayNames[dt.getDay()];
+    const mName = monthNames[currentMonth];
+
+    setHariTanggal(`${dayName}, ${dayToUse} ${mName} ${currentYear}`);
+    const mm = String(currentMonth + 1).padStart(2, '0');
+    const dd = String(dayToUse).padStart(2, '0');
+    setDatePickerValue(`${currentYear}-${mm}-${dd}`);
+
     setKegiatan('');
     setInstansi('');
     setKeterangan('Lengkap');
@@ -147,6 +280,14 @@ export default function GedungSchedule({
   const handleOpenEdit = (schedule: HallSchedule) => {
     setEditingSchedule(schedule);
     setHariTanggal(schedule.hariTanggal);
+    const parsed = parseScheduleDate(schedule.hariTanggal);
+    if (parsed) {
+      const mm = String(parsed.month + 1).padStart(2, '0');
+      const dd = String(parsed.day).padStart(2, '0');
+      setDatePickerValue(`${parsed.year}-${mm}-${dd}`);
+    } else {
+      setDatePickerValue('');
+    }
     setKegiatan(schedule.kegiatan);
     setInstansi(schedule.instansi);
     setKeterangan(schedule.keterangan);
@@ -197,24 +338,45 @@ export default function GedungSchedule({
   };
 
   // Filtered schedules for side list
-  const filteredSchedules = schedules.filter(item => {
+  const filteredSchedules = useMemo(() => {
     const term = searchTerm.toLowerCase();
-    const matchesSearch = 
-      item.hariTanggal.toLowerCase().includes(term) ||
-      item.kegiatan.toLowerCase().includes(term) ||
-      item.instansi.toLowerCase().includes(term) ||
-      item.keterangan.toLowerCase().includes(term);
 
-    if (selectedDay !== null) {
-      const match = item.hariTanggal.match(/\b(\d{1,2})\b/);
-      if (match && parseInt(match[1], 10) === selectedDay) {
-        return matchesSearch;
+    return schedules.filter(item => {
+      const matchesSearch = 
+        !term ||
+        item.hariTanggal.toLowerCase().includes(term) ||
+        item.kegiatan.toLowerCase().includes(term) ||
+        item.instansi.toLowerCase().includes(term) ||
+        item.keterangan.toLowerCase().includes(term);
+
+      if (!matchesSearch) return false;
+
+      const parsed = parseScheduleDate(item.hariTanggal);
+
+      // If user clicked a specific day in the calendar:
+      if (selectedDay !== null) {
+        if (parsed) {
+          return parsed.day === selectedDay && parsed.month === currentMonth && parsed.year === currentYear;
+        }
+        return false;
       }
-      return false;
-    }
 
-    return matchesSearch;
-  });
+      // If user is searching text:
+      if (term) {
+        return true;
+      }
+
+      // Default scope: 'month' means only show schedules for the month/year currently viewed on the calendar
+      if (filterScope === 'month') {
+        if (parsed) {
+          return parsed.month === currentMonth && parsed.year === currentYear;
+        }
+        return false;
+      }
+
+      return true;
+    });
+  }, [schedules, searchTerm, selectedDay, currentMonth, currentYear, filterScope]);
 
   return (
     <section id="jadwal-gedung" className="py-20 bg-slate-50 relative border-b border-slate-200/80">
@@ -278,13 +440,16 @@ export default function GedungSchedule({
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setCurrentDate(new Date(2026, 5, 1));
-                    setSelectedDay(null);
-                  }}
-                  className="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-bold transition cursor-pointer"
+                  onClick={handleGoToToday}
+                  className={`px-3 py-1.5 rounded-xl border text-xs font-extrabold transition cursor-pointer flex items-center gap-1.5 ${
+                    isCurrentMonthToday
+                      ? 'bg-emerald-50 border-emerald-300 text-emerald-850 shadow-xs ring-1 ring-emerald-200'
+                      : 'border-slate-200 hover:bg-slate-100 text-slate-700'
+                  }`}
+                  title={`Menampilkan bulan ini (${monthNames[today.getMonth()]} ${today.getFullYear()})`}
                 >
-                  Hari Ini
+                  <span className={`w-2 h-2 rounded-full ${isCurrentMonthToday ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
+                  <span>Hari Ini</span>
                 </button>
                 <button
                   type="button"
@@ -320,6 +485,7 @@ export default function GedungSchedule({
                 const hasSchedules = daySchedules.length > 0;
                 const isSelected = selectedDay === day;
                 const isFirstDayOfMonth = day === 1;
+                const isToday = isCurrentMonthToday && today.getDate() === day;
 
                 return (
                   <button
@@ -328,25 +494,38 @@ export default function GedungSchedule({
                     onClick={() => setSelectedDay(isSelected ? null : day)}
                     className={`h-16 p-1.5 rounded-xl border text-left flex flex-col justify-between transition cursor-pointer relative ${
                       isSelected
-                        ? 'border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-400'
-                        : hasSchedules
-                          ? 'border-emerald-200 bg-emerald-50/30 hover:bg-emerald-50/60'
-                          : annualEvent
-                            ? 'border-amber-300 bg-amber-50/40 hover:bg-amber-50/70'
-                            : 'border-slate-150 hover:bg-slate-50'
+                        ? 'border-emerald-500 bg-emerald-50/80 ring-2 ring-emerald-400 shadow-sm'
+                        : isToday
+                          ? 'border-emerald-500 bg-emerald-50/30 ring-2 ring-emerald-300'
+                          : hasSchedules
+                            ? 'border-emerald-200 bg-emerald-50/30 hover:bg-emerald-50/60'
+                            : annualEvent
+                              ? 'border-amber-300 bg-amber-50/40 hover:bg-amber-50/70'
+                              : 'border-slate-150 hover:bg-slate-50'
                     }`}
                   >
                     <div className="flex items-center justify-between w-full">
                       <span className={`text-xs font-black ${
-                        isSelected ? 'text-emerald-800 font-extrabold' : 'text-slate-700'
+                        isSelected 
+                          ? 'text-emerald-800 font-extrabold' 
+                          : isToday 
+                            ? 'text-emerald-700 font-black' 
+                            : 'text-slate-700'
                       }`}>
                         {day}
                       </span>
-                      {isFirstDayOfMonth && (
-                        <span className="text-[8px] font-extrabold uppercase px-1 py-0.2 rounded bg-indigo-100 text-indigo-800">
-                          Jumpa Pagi
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1">
+                        {isToday && (
+                          <span className="text-[7.5px] font-black uppercase px-1 py-0.2 rounded bg-emerald-600 text-white shadow-xs">
+                            Hari Ini
+                          </span>
+                        )}
+                        {isFirstDayOfMonth && !isToday && (
+                          <span className="text-[8px] font-extrabold uppercase px-1 py-0.2 rounded bg-indigo-100 text-indigo-800">
+                            Jumpa Pagi
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex flex-col gap-0.5 w-full overflow-hidden">
@@ -359,7 +538,7 @@ export default function GedungSchedule({
                         <div 
                           key={s.id} 
                           className="text-[9px] font-bold truncate text-emerald-800 bg-emerald-100 px-1 py-0.5 rounded"
-                          title={s.kegiatan}
+                          title={`${s.hariTanggal}: ${s.kegiatan}`}
                         >
                           {s.kegiatan}
                         </div>
@@ -379,23 +558,24 @@ export default function GedungSchedule({
             <div className="flex items-center gap-4 flex-wrap mt-4 pt-3 border-t border-slate-100 text-[11px] font-semibold text-slate-600">
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                <span>Agenda Pemakaian Terdaftar</span>
+                <span>Agenda Terdaftar ({monthNames[currentMonth]} {currentYear})</span>
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
                 <span>Peringatan Tahunan Pemkot</span>
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
-                <span>Awal Bulan (Jumpa Pagi)</span>
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 ring-2 ring-emerald-300"></span>
+                <span>Hari Ini ({today.getDate()} {monthNames[today.getMonth()]})</span>
               </span>
               {selectedDay !== null && (
                 <button
                   type="button"
                   onClick={() => setSelectedDay(null)}
-                  className="ml-auto text-xs font-bold text-rose-600 hover:underline cursor-pointer"
+                  className="ml-auto text-xs font-bold text-rose-600 hover:underline cursor-pointer flex items-center gap-1"
                 >
-                  Tampilkan Semua Tanggal
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Tampilkan Semua Tanggal</span>
                 </button>
               )}
             </div>
@@ -403,7 +583,7 @@ export default function GedungSchedule({
 
           {/* RIGHT: JADWAL PEMAKAIAN GEDUNG (5 Columns) */}
           <div className="lg:col-span-5 bg-white rounded-3xl border border-slate-200/90 p-6 shadow-sm space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 gap-2">
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-xl bg-blue-50 text-blue-700 border border-blue-200">
                   <CalendarDays className="w-5 h-5" />
@@ -415,11 +595,57 @@ export default function GedungSchedule({
                   <p className="text-[11px] text-slate-500 font-medium">
                     {selectedDay !== null
                       ? `Filter: Tanggal ${selectedDay} ${monthNames[currentMonth]} ${currentYear}`
-                      : 'Seluruh agenda penggunaan terkini'}
+                      : filterScope === 'month'
+                        ? `Agenda Bulan ${monthNames[currentMonth]} ${currentYear}`
+                        : 'Seluruh agenda penggunaan'}
                   </p>
                 </div>
               </div>
+
+              {/* Scope Switcher between Month and All */}
+              {selectedDay === null && (
+                <div className="flex items-center gap-1 p-0.5 rounded-lg bg-slate-100 border border-slate-200 text-[10px] font-bold shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setFilterScope('month')}
+                    className={`px-2 py-1 rounded-md transition cursor-pointer ${
+                      filterScope === 'month'
+                        ? 'bg-white text-emerald-800 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    Bulan Ini
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFilterScope('all')}
+                    className={`px-2 py-1 rounded-md transition cursor-pointer ${
+                      filterScope === 'all'
+                        ? 'bg-white text-emerald-800 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    Semua
+                  </button>
+                </div>
+              )}
             </div>
+
+            {/* Filter Active Notice if Day selected */}
+            {selectedDay !== null && (
+              <div className="flex items-center justify-between bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 text-xs">
+                <span className="font-bold text-emerald-900">
+                  Filter aktif: Tanggal <b>{selectedDay} {monthNames[currentMonth]} {currentYear}</b>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedDay(null)}
+                  className="text-[11px] font-extrabold text-rose-600 hover:underline cursor-pointer"
+                >
+                  Reset Filter
+                </button>
+              </div>
+            )}
 
             {/* Search Input */}
             <div className="relative">
@@ -625,18 +851,33 @@ export default function GedungSchedule({
               </div>
 
               <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                <div>
-                  <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Hari / Tanggal <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={hariTanggal}
-                    onChange={(e) => setHariTanggal(e.target.value)}
-                    placeholder="Contoh: Senin, 25 Mei 2026 atau Kam, 28/05/2026"
-                    className="w-full text-xs font-semibold px-4 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none shadow-sm transition"
-                    required
-                  />
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">
+                      Hari / Tanggal Agenda <span className="text-rose-500">*</span>
+                    </label>
+                    <span className="text-[10px] text-slate-400 font-semibold">Pilih tanggal atau sesuaikan teks</span>
+                  </div>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <input
+                      type="date"
+                      value={datePickerValue}
+                      onChange={(e) => handleDatePickerChange(e.target.value)}
+                      className="text-xs font-semibold px-3 py-2.5 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none shadow-sm transition bg-white"
+                      title="Pilih tanggal dari kalender pop-up"
+                    />
+                    <input
+                      type="text"
+                      value={hariTanggal}
+                      onChange={(e) => setHariTanggal(e.target.value)}
+                      placeholder="Contoh: Senin, 15 September 2026"
+                      className="flex-1 text-xs font-semibold px-4 py-2.5 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none shadow-sm transition"
+                      required
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-500 font-medium">
+                    Sistem mendeteksi bulan dan tahun otomatis (contoh: <i>Jumat, 25 September 2026</i>) sehingga hanya tampil di bulan terkait.
+                  </p>
                 </div>
 
                 <div>
